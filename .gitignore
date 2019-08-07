@@ -1,0 +1,10 @@
+yarn-debug.log*
+yarn-error.log*
+/node_modules
+/.env
+
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN
