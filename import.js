@@ -4,9 +4,17 @@ const pMap = require('p-map')
 const { Client: ElasticClient } = require('@elastic/elasticsearch')
 
 const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
-const trelloKey = process.env.APP_TRELLO_KEY
-const trelloToken = process.env.APP_TRELLO_TOKEN
 const board = process.env.APP_TRELLO_BOARD
+const startDate = process.env.APP_TRELLO_START_DATE
+const endDate = process.env.APP_TRELLO_END_DATE
+
+if (board === undefined) {
+  throw new Error('APP_TRELLO_BOARD is not defined')
+}
+
+if (startDate === undefined) {
+  throw new Error('APP_TRELLO_START_DATE is not defined')
+}
 
 const wait = (time) => new Promise((resolve) => setTimeout(() => resolve(), time))
 
@@ -19,7 +27,7 @@ const requestCard = async (id) => {
   }
   let res
   try {
-    res = await got(`https://api.trello.com/1/cards/${id}?key=${trelloKey}&token=${trelloToken}`)
+    res = await got(`https://api.trello.com/1/cards/${id}`)
   } catch (e) {
     await wait(5000)
     return requestCard(id)
@@ -37,10 +45,12 @@ const elastic = new ElasticClient({
   },
 })
 
-let totalCount = 0
-
 const importEvent = async (action) => {
   if (action.memberCreator.id !== trelloBugBotId) {
+    return
+  }
+
+  if (endDate !== undefined && (new Date(action.date)) < (new Date(endDate))) {
     return
   }
 
@@ -118,9 +128,12 @@ const importChunk = async (before) => {
   await pMap(actions, async (action) => {
     await importEvent(action)
   }, { concurrency: 50 })
+  if (endDate !== undefined && (new Date(actions[actions.length - 1].date)) < (new Date(endDate))) {
+    return
+  }
   if (actions.length === 1000) {
     await importChunk(actions[999].id)
   }
 }
 
-importChunk('2019-08-07T01:45:00.000Z')
+importChunk(startDate)
