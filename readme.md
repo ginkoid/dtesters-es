@@ -2,9 +2,48 @@
 
 Ingests Discord Testers Trello data into elasticsearch.
 
+## Using the search API
+
+Send a `GET` request to `/dtesters/search` with some of the querystring parameters. The response will look like this
+
+```json
+{
+  "total: {
+    "value": 100,
+    "relation": "eq"
+  },
+  "hits": [{
+    "event": {
+      "time": 12345678,
+      "board": "aaaaaaaaaa",
+      "list": "bbbbbbbbbb",
+      "card": "cccccccccc",
+      "id": "11111",
+      "kind": "archive"
+    }
+  }]
+}
+```
+
+* `total.relation` can be either `eq` or `gte`. `gte` represents that there are more than `total.value` results, wheras `eq` represents that the result count is exact.
+* `hits[].event` is the source event. Each event will have different properties, but all of them will have `time` and `kind`.
+
+### Parameters
+
+* `limit` (required): The number of results on a page. Set to `0` if you only care about the number of results, not the results themselves.
+* `page` (required): The page index for pagination. Starts at `0`.
+* terms `board`, `card`, `id`, `kind`, `list`, `user`: Providing these attributes will filter based on the exact values provided. Partial matches are not possible
+* `content`: Providing this attribute will search based on the `actual`, `client`, `content`, `expected`, `steps`, `system`. This supports partial matches.
+
+Note that at least one of the terms or `content` must be provided.
+
+## Running your own
+
 Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `events`.
 
-* `app.js` will listen for Trello webhooks to `/discord/events`, and ingest events into elasticsearch one at a time.
+* `app.js` will
+  * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time
+  * serve search requests from elasticsearch for `/dtesters/search`
 
 * `import.js` will ingest historical events from Trello into elasticsearch. Because of how the Trello API works, events are indexed in reverse order.
   * Define the `APP_TRELLO_BOARD` environment variable to be the trello ID of the board which you want to ingest.
