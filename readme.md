@@ -8,7 +8,7 @@ Send a `GET` request to `/dtesters/search` with some of the querystring paramete
 
 ```json
 {
-  "total: {
+  "total": {
     "value": 100,
     "relation": "eq"
   },
