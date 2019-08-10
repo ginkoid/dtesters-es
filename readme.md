@@ -39,7 +39,7 @@ Note that at least one of the terms or `content` must be provided.
 
 ## Running your own
 
-Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `events`.
+Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `event`. The index and its mappings and settings are in `index.json`.
 
 * `app.js` will
   * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time

@@ -12,6 +12,7 @@ const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
 
 const termFields = ['board', 'card', 'id', 'kind', 'list', 'user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system']
+const indexName = 'event'
 
 const wait = (time) => new Promise((resolve) => setTimeout(() => resolve(), time))
 
@@ -101,9 +102,6 @@ http.createServer(async (req, res) => {
     if (body.action.data.board !== undefined) {
       eventBody.board = body.action.data.board.id
     }
-    if (body.action.data.list !== undefined) {
-      eventBody.list = body.action.data.list.id
-    }
     let card
     if (body.action.data.card !== undefined) {
       eventBody.card = body.action.data.card.id
@@ -120,6 +118,7 @@ http.createServer(async (req, res) => {
 
     if (body.action.type === 'createCard') {
       eventBody.kind = 'approve'
+      eventBody.title = card.name
       if (eventBody.content === undefined) {
         eventBody.user = parsedCard.groups.user
         eventBody.steps = parsedCard.groups.steps
@@ -128,6 +127,9 @@ http.createServer(async (req, res) => {
         eventBody.client = parsedCard.groups.client
         eventBody.system = parsedCard.groups.system
       }
+    } else if (body.action.type === 'addAttachmentToCard') {
+      eventBody.kind = 'attach'
+      eventBody.user = body.action.data.attachment.name
     } else if (body.action.type === 'commentCard') {
       const parsedComment = body.action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
       if (parsedComment === null) {
@@ -158,7 +160,7 @@ http.createServer(async (req, res) => {
     }
 
     await elastic.index({
-      index: 'events',
+      index: indexName,
       body: eventBody,
     })
 
@@ -233,6 +235,7 @@ http.createServer(async (req, res) => {
           },
           sort,
         },
+        index: indexName,
         timeout: '5s',
         size: limit,
         from: page * limit,

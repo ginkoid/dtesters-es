@@ -8,6 +8,8 @@ const board = process.env.APP_TRELLO_BOARD
 const startDate = process.env.APP_TRELLO_START_DATE
 const endDate = process.env.APP_TRELLO_END_DATE
 
+const indexName = 'event'
+
 if (board === undefined) {
   throw new Error('APP_TRELLO_BOARD is not defined')
 }
@@ -63,9 +65,6 @@ const importEvent = async (action) => {
   if (action.data.board !== undefined) {
     eventBody.board = action.data.board.id
   }
-  if (action.data.list !== undefined) {
-    eventBody.list = action.data.list.id
-  }
   let card
   if (action.data.card !== undefined) {
     eventBody.card = action.data.card.id
@@ -82,6 +81,7 @@ const importEvent = async (action) => {
 
   if (action.type === 'createCard') {
     eventBody.kind = 'approve'
+    eventBody.title = card.name
     if (eventBody.content === undefined) {
       eventBody.user = parsedCard.groups.user
       eventBody.steps = parsedCard.groups.steps
@@ -90,6 +90,9 @@ const importEvent = async (action) => {
       eventBody.client = parsedCard.groups.client
       eventBody.system = parsedCard.groups.system
     }
+  } else if (action.type === 'addAttachmentToCard') {
+    eventBody.kind = 'attach'
+    eventBody.user = action.data.attachment.name
   } else if (action.type === 'commentCard') {
     const parsedComment = action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
     if (parsedComment === null) {
@@ -117,14 +120,14 @@ const importEvent = async (action) => {
   }
 
   await elastic.index({
-    index: 'events',
+    index: indexName,
     body: eventBody,
   })
 }
 
 const importChunk = async (before) => {
   console.log('importing chunk before', before)
-  const actions = JSON.parse((await got(`https://api.trello.com/1/boards/${board}/actions/?limit=1000&filter=createCard,commentCard,updateCard&before=${before}`)).body)
+  const actions = JSON.parse((await got(`https://api.trello.com/1/boards/${board}/actions/?limit=1000&filter=createCard,commentCard,updateCard,addAttachmentToCard&before=${before}`)).body)
   await pMap(actions, async (action) => {
     await importEvent(action)
   }, { concurrency: 50 })
