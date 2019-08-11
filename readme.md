@@ -16,26 +16,35 @@ Send a `GET` request to `/dtesters/search` with some of the querystring paramete
     "event": {
       "time": 12345678,
       "board": "aaaaaaaaaa",
-      "list": "bbbbbbbbbb",
       "card": "cccccccccc",
       "id": "11111",
-      "kind": "archive"
-    }
+      "kind": "cr",
+      "content": "dddd"
+    },
+    "highlights": [{
+      "key": "content",
+      "text": "dddd",
+      "positions": [{ "start": 0, "end": 4 }]
+    }]
   }]
 }
 ```
 
 * `total.relation` can be either `eq` or `gte`. `gte` represents that there are more than `total.value` results, wheras `eq` represents that the result count is exact.
-* `hits[].event` is the source event. Each event will have different properties, but all of them will have `time` and `kind`.
+* `hits[].event` is the source event. Specify keys included here using the `include` query parameter.
+* `hits[].highlights[]` specifies the relevant text for highlighting results of a search.
+* `hits[].highlights[].positions[]` specifies the positions of the highlights. `start` is inclusive, `end` is exclusive.
 
 ### Parameters
 
 * `limit` (required): The number of results on a page. Set to `0` if you only care about the number of results, not the results themselves.
 * `page` (required): The page index for pagination. Starts at `0`.
-* terms `board`, `card`, `id`, `kind`, `list`, `user`: Providing these attributes will filter based on the exact values provided. Partial matches are not possible
-* `content`: Providing this attribute will search based on the `actual`, `client`, `content`, `expected`, `steps`, `system`. This supports partial matches.
-
-Note that at least one of the terms or `content` must be provided.
+* `sort` (required): Specifies the sort that the results will use. Either `recency` or `relevance`.
+* `before` (optional): Only include events before this time. Accepts seconds since Jan 1 1970.
+* `after` (optional): Only include after before this time. Accepts seconds since Jan 1 1970.
+* `include` (optional): The list of event attributes to include in the response. If this isn't provided, all attributes are included.
+* terms `board`, `card`, `id`, `kind`, `user` (optional): Providing these attributes will filter based on the exact values provided. Partial matches are not possible
+* `content` (optional): Providing this attribute will search based on the `actual`, `client`, `content`, `expected`, `steps`, `system`, `title`. Supports partial matches.
 
 ## Running your own
 

@@ -2,6 +2,7 @@ const { promisify } = require('util')
 const crypto = require('crypto')
 const http = require('http')
 require('dotenv').config()
+const he = require('he')
 const got = require('got')
 const getRawBody = promisify(require('raw-body'))
 const { Client: ElasticClient } = require('@elastic/elasticsearch')
@@ -10,9 +11,35 @@ const trelloSecret = process.env.APP_TRELLO_SECRET
 const trelloWebhook = Buffer.from(process.env.APP_TRELLO_WEBHOOK)
 const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
 
-const termFields = ['board', 'card', 'id', 'kind', 'list', 'user']
-const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system']
+const termFields = ['board', 'card', 'id', 'kind', 'user']
+const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
 const indexName = 'event'
+
+const findEms = (text) => {
+  const result = []
+  let lastIndex = -1
+  let inTag = false
+  while(true) {
+    let idx
+    if (inTag) {
+      idx = text.indexOf('</em>', lastIndex + 1)
+    } else {
+      idx = text.indexOf('<em>', lastIndex + 1)
+    }
+    if (idx === -1) {
+      return result
+    }
+    if (inTag) {
+      result[result.length - 1].end = idx - (result.length - 1) * 9 - 4
+    } else {
+      result.push({
+        start: idx - result.length * 9,
+      })
+    }
+    inTag = !inTag
+    lastIndex = idx
+  }
+}
 
 const wait = (time) => new Promise((resolve) => setTimeout(() => resolve(), time))
 
@@ -185,12 +212,11 @@ http.createServer(async (req, res) => {
       sendResponse(400, 'The page is invalid.')
       return
     }
-    let hasTerm = false
     const musts = []
+    const filters = []
     params.forEach((v, k) => {
       if (termFields.includes(k)) {
-        hasTerm = true
-        musts.push({
+        filters.push({
           term: {
             [k]: {
               value: v,
@@ -199,9 +225,36 @@ http.createServer(async (req, res) => {
         })
       }
     })
-    if (params.get('content') === null && !hasTerm) {
-      sendResponse(400, 'The request must not be empty.')
-      return
+    const beforeParam = params.get('before')
+    let before = 0
+    if (beforeParam !== null) {
+      before = parseInt(beforeParam)
+      if (Number.isNaN(before) || before < 0) {
+        sendResponse(400, 'The before is invalid.')
+        return
+      }
+      filters.push({
+        range: {
+          time: {
+            lte: before,
+          },
+        },
+      })
+    }
+    const afterParam = params.get('after')
+    if (afterParam !== null) {
+      const after = parseInt(afterParam)
+      if (Number.isNaN(after) || after < 0 || after > before) {
+        sendResponse(400, 'The after is invalid.')
+        return
+      }
+      filters.push({
+        range: {
+          time: {
+            gte: after,
+          },
+        },
+      })
     }
     if (params.get('content') !== null) {
       musts.push({
@@ -224,6 +277,15 @@ http.createServer(async (req, res) => {
       sendResponse(400, 'The sort is invalid.')
       return
     }
+    const includeParam = params.get('include')
+    let includeKeys
+    if (includeParam !== null) {
+      includeKeys = includeParam.split(',')
+    }
+    const highlightFields = {}
+    matchFields.forEach((field) => {
+      highlightFields[field] = {}
+    })
     let result
     try {
       result = await elastic.search({
@@ -231,9 +293,16 @@ http.createServer(async (req, res) => {
           query: {
             bool: {
               must: musts,
+              filter: filters,
             },
           },
           sort,
+          highlight: {
+            boundary_scanner_locale: 'en-US',
+            encoder: 'html',
+            order: 'score',
+            fields: highlightFields,
+          },
         },
         index: indexName,
         timeout: '5s',
@@ -254,9 +323,38 @@ http.createServer(async (req, res) => {
     })
     res.end(JSON.stringify({
       total: result.body.hits.total,
-      hits: result.body.hits.hits.map(hit => ({
-        event: hit._source,
-      }))
+      hits: result.body.hits.hits.map(hit => {
+        const highlight = hit.highlight || {}
+        const highlightResult = []
+        Object.entries(highlight).forEach(([key, highlights]) => {
+          if (includeKeys !== undefined && !includeKeys.includes(key)) {
+            return
+          }
+          highlights.forEach((text) => {
+            const positions = findEms(text)
+            highlightResult.push({
+              key,
+              text: he.decode(text.replace(/(<em>|<\/em>)/g, '')),
+              positions,
+            })
+          })
+        })
+        let event
+        if (includeKeys === undefined) {
+          event = hit._source
+        } else {
+          event = {}
+          Object.keys(hit._source).forEach((key) => {
+            if (includeKeys.includes(key)) {
+              event[key] = hit._source[key]
+            }
+          })
+        }
+        return {
+          event,
+          highlights: highlightResult,
+        }
+      })
     }))
   } else {
     sendResponse(404, 'The request endpoint is invalid.')
