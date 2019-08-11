@@ -4,6 +4,10 @@ Ingests Discord Testers Trello data into elasticsearch.
 
 ## Using the search API
 
+### Hosted
+
+A hosted version of the search API is available at [gnk.gnk.io/dtesters/search](https://gnk.gnk.io/dtesters/search).
+
 Send a `GET` request to `/dtesters/search` with some of the querystring parameters. The response will look like this
 
 ```json
