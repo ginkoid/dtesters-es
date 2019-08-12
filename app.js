@@ -331,7 +331,7 @@ http.createServer(async (req, res) => {
             return
           }
           highlights.forEach((text) => {
-            const positions = findEms(text)
+            const positions = findEms(he.decode(text))
             highlightResult.push({
               key,
               text: he.decode(text.replace(/(<em>|<\/em>)/g, '')),
