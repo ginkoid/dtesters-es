@@ -11,6 +11,9 @@
       "card": {
         "type": "keyword"
       },
+      "link": {
+        "type": "keyword"
+      },
       "client": {
         "type": "text"
       },

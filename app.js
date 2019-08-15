@@ -11,9 +11,14 @@ const trelloSecret = process.env.APP_TRELLO_SECRET
 const trelloWebhook = Buffer.from(process.env.APP_TRELLO_WEBHOOK)
 const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
 
-const termFields = ['board', 'card', 'id', 'kind', 'user']
+const termFields = ['board', 'card', 'link', 'id', 'kind', 'user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
-const indexName = 'event'
+const ingestIndexName = 'events'
+const searchIndexName = 'events'
+const requestKinds = {
+  search: 0,
+  total: 1,
+}
 
 const findEms = (text) => {
   const result = []
@@ -57,6 +62,7 @@ const requestCard = async (id) => {
 
 const elastic = new ElasticClient({
   node: process.env.APP_ELASTIC_SERVER,
+  requestTimeout: 5000,
   auth: {
     username: process.env.APP_ELASTIC_USER,
     password: process.env.APP_ELASTIC_PASSWORD,
@@ -132,6 +138,7 @@ http.createServer(async (req, res) => {
     let card
     if (body.action.data.card !== undefined) {
       eventBody.card = body.action.data.card.id
+      eventBody.link = body.action.data.card.shortLink
       card = await requestCard(body.action.data.card.id)
       parsedCard = card.desc.match(/^(?:Reported by (?<user>.*#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
       if (parsedCard === null) {
@@ -187,31 +194,47 @@ http.createServer(async (req, res) => {
     }
 
     await elastic.index({
-      index: indexName,
+      index: ingestIndexName,
       body: eventBody,
     })
 
     sendResponse(200, 'Event indexed.')
-  } else if (splitUrl[0] === '/dtesters/search') {
+  } else if (splitUrl[0] === '/dtesters/search' || splitUrl[0] === '/dtesters/total') {
+    let requestKind
+    if (splitUrl[0] === '/dtesters/search') {
+      requestKind = requestKinds.search
+    } else {
+      requestKind = requestKinds.total
+    }
+
     if (req.method !== 'GET') {
       sendResponse(405, 'The request method is invalid.')
       return
     }
+
+    let params
     if (splitUrl[1] === undefined) {
-      sendResponse(400, 'The request must not be empty.')
-      return
+      params = new URLSearchParams('')
+    } else {
+      params = new URLSearchParams(splitUrl[1])
     }
-    const params = new URLSearchParams(splitUrl[1])
-    const limit = parseInt(params.get('limit'))
-    if (Number.isNaN(limit) || limit < 0 || limit > 50) {
-      sendResponse(400, 'The limit is invalid.')
-      return
+
+    let limit
+    let page
+
+    if (requestKind === requestKinds.search) {
+      limit = parseInt(params.get('limit'))
+      if (Number.isNaN(limit) || limit < 0 || limit > 50) {
+        sendResponse(400, 'The limit is invalid.')
+        return
+      }
+      page = parseInt(params.get('page'))
+      if (Number.isNaN(page) || page < 0 || page > 100) {
+        sendResponse(400, 'The page is invalid.')
+        return
+      }
     }
-    const page = parseInt(params.get('page'))
-    if (Number.isNaN(page) || page < 0 || page > 100) {
-      sendResponse(400, 'The page is invalid.')
-      return
-    }
+
     const musts = []
     const filters = []
     params.forEach((v, k) => {
@@ -256,7 +279,17 @@ http.createServer(async (req, res) => {
         },
       })
     }
-    if (params.get('content') !== null) {
+    if (params.get('query') !== null) {
+      musts.push({
+        simple_query_string: {
+          query: params.get('query'),
+          fields: [...matchFields, ...termFields],
+          default_operator: 'AND',
+          flags: 'AND|ESCAPE|NOT|OR|PHRASE|PRECEDENCE|PREFIX|WHITESPACE',
+          lenient: true,
+        },
+      })
+    } else if (params.get('content') !== null) {
       musts.push({
         multi_match: {
           query: params.get('content'),
@@ -264,98 +297,122 @@ http.createServer(async (req, res) => {
         },
       })
     }
+
     let sort
-    if (params.get('sort') === 'relevance') {
-      sort = undefined
-    } else if (params.get('sort') === 'recency') {
-      sort = [{
-        time: {
-          order: 'desc',
-        },
-      }]
-    } else {
-      sendResponse(400, 'The sort is invalid.')
-      return
-    }
-    const includeParam = params.get('include')
     let includeKeys
-    if (includeParam !== null) {
-      includeKeys = includeParam.split(',')
+
+    if (requestKind === requestKinds.search) {
+      if (params.get('sort') === 'relevance') {
+        sort = undefined
+      } else if (params.get('sort') === 'recency') {
+        sort = [{
+          time: {
+            order: 'desc',
+          },
+        }]
+      } else {
+        sendResponse(400, 'The sort is invalid.')
+        return
+      }
+      const includeParam = params.get('include')
+      if (includeParam !== null) {
+        includeKeys = includeParam.split(',')
+      }
     }
+
     const highlightFields = {}
     matchFields.forEach((field) => {
       highlightFields[field] = {}
     })
+
+    const query = {
+      bool: {
+        must: musts,
+        filter: filters,
+      },
+    }
+
     let result
     try {
-      result = await elastic.search({
-        body: {
-          query: {
-            bool: {
-              must: musts,
-              filter: filters,
+      if (requestKind === requestKinds.total) {
+        result = await elastic.count({
+          body: {
+            query,
+          },
+          index: searchIndexName,
+        })
+      } else {
+        result = await elastic.search({
+          body: {
+            query,
+            sort,
+            highlight: {
+              boundary_scanner_locale: 'en-US',
+              encoder: 'html',
+              order: 'score',
+              fields: highlightFields,
             },
           },
-          sort,
-          highlight: {
-            boundary_scanner_locale: 'en-US',
-            encoder: 'html',
-            order: 'score',
-            fields: highlightFields,
-          },
-        },
-        index: indexName,
-        timeout: '5s',
-        size: limit,
-        from: page * limit,
-      })
+          index: searchIndexName,
+          timeout: '5s',
+          size: limit,
+          from: page * limit,
+        })
+      }
     } catch (e) {
       console.error(e, e.meta)
       sendResponse(500, 'Internal search failure.')
       return
     }
-    if (result.body.timed_out) {
-      sendResponse(503, 'Search timed out.')
+    if (result.statusCode !== 200 || result.body.timed_out) {
+      console.error(result)
+      sendResponse(500, 'Internal search failure.')
       return
     }
     res.writeHead(200, {
       'content-type': 'application/json',
     })
-    res.end(JSON.stringify({
-      total: result.body.hits.total,
-      hits: result.body.hits.hits.map(hit => {
-        const highlight = hit.highlight || {}
-        const highlightResult = []
-        Object.entries(highlight).forEach(([key, highlights]) => {
-          if (includeKeys !== undefined && !includeKeys.includes(key)) {
-            return
-          }
-          highlights.forEach((text) => {
-            const positions = findEms(he.decode(text))
-            highlightResult.push({
-              key,
-              text: he.decode(text.replace(/(<em>|<\/em>)/g, '')),
-              positions,
+    if (requestKind === requestKinds.search) {
+      res.end(JSON.stringify({
+        total: result.body.hits.total,
+        hits: result.body.hits.hits.map(hit => {
+          const highlight = hit.highlight || {}
+          const highlightResult = []
+          Object.entries(highlight).forEach(([key, highlights]) => {
+            if (includeKeys !== undefined && !includeKeys.includes(key)) {
+              return
+            }
+            highlights.forEach((text) => {
+              const positions = findEms(he.decode(text))
+              highlightResult.push({
+                key,
+                text: he.decode(text.replace(/(<em>|<\/em>)/g, '')),
+                positions,
+              })
             })
           })
+          let event
+          if (includeKeys === undefined) {
+            event = hit._source
+          } else {
+            event = {}
+            Object.keys(hit._source).forEach((key) => {
+              if (includeKeys.includes(key)) {
+                event[key] = hit._source[key]
+              }
+            })
+          }
+          return {
+            event,
+            highlights: highlightResult,
+          }
         })
-        let event
-        if (includeKeys === undefined) {
-          event = hit._source
-        } else {
-          event = {}
-          Object.keys(hit._source).forEach((key) => {
-            if (includeKeys.includes(key)) {
-              event[key] = hit._source[key]
-            }
-          })
-        }
-        return {
-          event,
-          highlights: highlightResult,
-        }
-      })
-    }))
+      }))
+    } else {
+      res.end(JSON.stringify({
+        total: result.body.count,
+      }))
+    }
   } else {
     sendResponse(404, 'The request endpoint is invalid.')
     return

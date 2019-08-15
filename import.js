@@ -8,7 +8,7 @@ const board = process.env.APP_TRELLO_BOARD
 const startDate = process.env.APP_TRELLO_START_DATE
 const endDate = process.env.APP_TRELLO_END_DATE
 
-const indexName = 'event'
+const indexName = 'events'
 
 if (board === undefined) {
   throw new Error('APP_TRELLO_BOARD is not defined')
@@ -68,6 +68,7 @@ const importEvent = async (action) => {
   let card
   if (action.data.card !== undefined) {
     eventBody.card = action.data.card.id
+    eventBody.link = action.data.card.shortLink
     card = await requestCard(action.data.card.id)
     parsedCard = card.desc.match(/^(?:Reported by (?<user>.*#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
     if (parsedCard === null) {

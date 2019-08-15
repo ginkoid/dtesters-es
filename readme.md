@@ -1,12 +1,10 @@
 # DTesters Elasticsearch
 
-Ingests Discord Testers Trello data into elasticsearch.
+### The API is hosted for public use at [gnk.gnk.io/dtesters/search](https://gnk.gnk.io/dtesters/search).
+
+An API for ingesting and searching Discord Testers data.
 
 ## Using the search API
-
-### Hosted
-
-A hosted version of the search API is available at [gnk.gnk.io/dtesters/search](https://gnk.gnk.io/dtesters/search).
 
 Send a `GET` request to `/dtesters/search` with some of the querystring parameters. The response will look like this
 
@@ -45,14 +43,15 @@ Send a `GET` request to `/dtesters/search` with some of the querystring paramete
 * `page` (required): The page index for pagination. Starts at `0`.
 * `sort` (required): Specifies the sort that the results will use. Either `recency` or `relevance`.
 * `before` (optional): Only include events before this time. Accepts seconds since Jan 1 1970.
-* `after` (optional): Only include after before this time. Accepts seconds since Jan 1 1970.
+* `after` (optional): Only include events after this time. Accepts seconds since Jan 1 1970.
 * `include` (optional): The list of event attributes to include in the response. If this isn't provided, all attributes are included.
-* terms `board`, `card`, `id`, `kind`, `user` (optional): Providing these attributes will filter based on the exact values provided. Partial matches are not possible
-* `content` (optional): Providing this attribute will search based on the `actual`, `client`, `content`, `expected`, `steps`, `system`, `title`. Supports partial matches.
+* terms `board`, `card`, `link`, `id`, `kind`, `user` (optional): Providing these attributes will filter based on the exact values provided. Partial matches are not possible
+* `content` (optional): Providing this parameter will search based on the `actual`, `client`, `content`, `expected`, `steps`, `system`, `title`. Supports partial matches.
+* `query` (optional): Providing this parameter will search based on all include and all content attrbutes, using the [elasticsearch simple query syntax](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-simple-query-string-query.html#simple-query-string-syntax)
 
 ## Running your own
 
-Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `event`. The index and its mappings and settings are in `index.json`.
+Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `events`. The index's mappings and settings are in `index.json`.
 
 * `app.js` will
   * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time
