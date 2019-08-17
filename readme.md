@@ -1,10 +1,10 @@
 # DTesters Elasticsearch
 
-### The API is hosted for public use at [gnk.gnk.io/dtesters/search](https://gnk.gnk.io/dtesters/search).
+### The API is hosted for anyone to use at `https://gnk.gnk.io/dtesters/search` and `https://gnk.gnk.io/dtesters/total`.
 
 An API for ingesting and searching Discord Testers data.
 
-## Using the search API
+## Using the `search` API
 
 Send a `GET` request to `/dtesters/search` with some of the querystring parameters. The response will look like this
 
@@ -37,11 +37,23 @@ Send a `GET` request to `/dtesters/search` with some of the querystring paramete
 * `hits[].highlights[]` specifies the relevant text for highlighting results of a search.
 * `hits[].highlights[].positions[]` specifies the positions of the highlights. `start` is inclusive, `end` is exclusive.
 
-### Parameters
+## Using the `total` API
 
-* `limit` (required): The number of results on a page. Set to `0` if you only care about the number of results, not the results themselves.
-* `page` (required): The page index for pagination. Starts at `0`.
-* `sort` (required): Specifies the sort that the results will use. Either `recency` or `relevance`.
+Send a `GET` request to `/dtesters/total` with some of the querystring parameters. The response will look like this
+
+```json
+{
+  "total": 100
+}
+```
+
+* `total` specifies the total number of results from that search
+
+## Parameters for `search` and `total`
+
+* `limit` (required) (`search` only): The number of results on a page. Set to `0` if you only care about the number of results, not the results themselves. Maximum of `50`.
+* `page` (required) (`search` only): The page index for pagination. Starts at `0`. Maximum of `100`.
+* `sort` (required) (`search` only): Specifies the sort that the results will use. Either `recency` or `relevance`.
 * `before` (optional): Only include events before this time. Accepts seconds since Jan 1 1970.
 * `after` (optional): Only include events after this time. Accepts seconds since Jan 1 1970.
 * `include` (optional): The list of event attributes to include in the response. If this isn't provided, all attributes are included.
