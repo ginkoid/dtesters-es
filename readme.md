@@ -1,6 +1,6 @@
 # DTesters Elasticsearch
 
-### The API is hosted for anyone to use at `https://gnk.gnk.io/dtesters/search` and `https://gnk.gnk.io/dtesters/total`.
+#### The API is hosted for anyone to use at `https://gnk.gnk.io`
 
 An API for ingesting and searching Discord Testers data.
 
