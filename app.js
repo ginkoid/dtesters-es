@@ -300,6 +300,7 @@ http.createServer(async (req, res) => {
 
     let sort
     let includeKeys
+    const highlightFields = {}
 
     if (requestKind === requestKinds.search) {
       if (params.get('sort') === 'relevance') {
@@ -318,12 +319,11 @@ http.createServer(async (req, res) => {
       if (includeParam !== null) {
         includeKeys = includeParam.split(',')
       }
-    }
 
-    const highlightFields = {}
-    matchFields.forEach((field) => {
-      highlightFields[field] = {}
-    })
+      matchFields.forEach((field) => {
+        highlightFields[field] = {}
+      })
+    }
 
     const query = {
       bool: {
@@ -379,9 +379,6 @@ http.createServer(async (req, res) => {
           const highlight = hit.highlight || {}
           const highlightResult = []
           Object.entries(highlight).forEach(([key, highlights]) => {
-            if (includeKeys !== undefined && !includeKeys.includes(key)) {
-              return
-            }
             highlights.forEach((text) => {
               const positions = findEms(he.decode(text))
               highlightResult.push({
