@@ -4,11 +4,12 @@ const pMap = require('p-map')
 const { Client: ElasticClient } = require('@elastic/elasticsearch')
 
 const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
+const trelloDabbitId = process.env.APP_TRELLO_DABBIT_ID
 const board = process.env.APP_TRELLO_BOARD
 const startDate = process.env.APP_TRELLO_START_DATE
 const endDate = process.env.APP_TRELLO_END_DATE
 
-const indexName = 'events'
+const indexName = 'event'
 
 if (board === undefined) {
   throw new Error('APP_TRELLO_BOARD is not defined')
@@ -31,6 +32,9 @@ const requestCard = async (id) => {
   try {
     res = await got(`https://api.trello.com/1/cards/${id}`)
   } catch (e) {
+    if (e instanceof got.HTTPError && (e.response.statusCode === 404 || e.response.statusCode === 401)) {
+      return e
+    }
     await wait(5000)
     return requestCard(id)
   }
@@ -48,10 +52,6 @@ const elastic = new ElasticClient({
 })
 
 const importEvent = async (action) => {
-  if (action.memberCreator.id !== trelloBugBotId) {
-    return
-  }
-
   if (endDate !== undefined && (new Date(action.date)) < (new Date(endDate))) {
     return
   }
@@ -70,13 +70,20 @@ const importEvent = async (action) => {
     eventBody.card = action.data.card.id
     eventBody.link = action.data.card.shortLink
     card = await requestCard(action.data.card.id)
-    parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
-    if (parsedCard === null) {
-      if (action.type === 'createCard' || action.type === 'updateCard') {
-        eventBody.content = card.desc
+    if (card instanceof Error) {
+      return
+    }
+    if (action.memberCreator.id === trelloBugBotId || action.memberCreator.id === trelloDabbitId) {
+      parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
+      if (parsedCard === null) {
+        if (action.type === 'createCard') {
+          eventBody.content = card.desc
+        }
+      } else {
+        eventBody.id = parsedCard.groups.id
       }
-    } else {
-      eventBody.id = parsedCard.groups.id
+    } else if (action.type === 'createCard') {
+      eventBody.content = card.desc
     }
   }
 
@@ -111,8 +118,13 @@ const importEvent = async (action) => {
       eventBody.content = parsedComment[1]
     }
   } else if (action.type === 'updateCard') {
-    if (card.closed) {
+    if (action.data.old === undefined || action.data.card === undefined) {
+      return
+    }
+    if (!action.data.old.closed && action.data.card.closed) {
       eventBody.kind = 'archive'
+    } else if (action.data.old.closed && !action.data.card.closed) {
+      eventBody.kind = 'unarchive'
     } else {
       return
     }

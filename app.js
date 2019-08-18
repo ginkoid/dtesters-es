@@ -10,11 +10,12 @@ const { Client: ElasticClient } = require('@elastic/elasticsearch')
 const trelloSecret = process.env.APP_TRELLO_SECRET
 const trelloWebhook = Buffer.from(process.env.APP_TRELLO_WEBHOOK)
 const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
+const trelloDabbitId = process.env.APP_TRELLO_DABBIT_ID
 
 const termFields = ['board', 'card', 'link', 'id', 'kind', 'user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
-const ingestIndexName = 'events'
-const searchIndexName = 'events'
+const ingestIndexName = 'event'
+const searchIndexName = 'event'
 const requestKinds = {
   search: 0,
   total: 1,
@@ -53,6 +54,9 @@ const requestCard = async (id) => {
   try {
     res = await got(`https://api.trello.com/1/cards/${id}`)
   } catch (e) {
+    if (e instanceof got.HTTPError && (e.response.statusCode === 404 || e.response.statusCode === 401)) {
+      return e
+    }
     await wait(5000)
     return requestCard(id)
   }
@@ -121,11 +125,6 @@ http.createServer(async (req, res) => {
       return
     }
 
-    if (body.action.memberCreator.id !== trelloBugBotId) {
-      sendResponse(400, 'Event not indexed.')
-      return
-    }
-
     const eventBody = {
       time: Math.floor((new Date(body.action.date)).valueOf() / 1000),
     }
@@ -140,13 +139,21 @@ http.createServer(async (req, res) => {
       eventBody.card = body.action.data.card.id
       eventBody.link = body.action.data.card.shortLink
       card = await requestCard(body.action.data.card.id)
-      parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
-      if (parsedCard === null) {
-        if (body.action.type === 'createCard' || body.action.type === 'updateCard') {
-          eventBody.content = card.desc
+      if (card instanceof Error) {
+        sendResponse(400, 'Event not indexed.')
+        return
+      }
+      if (body.action.memberCreator.id === trelloBugBotId || body.action.memberCreator.id === trelloDabbitId) {
+        parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
+        if (parsedCard === null) {
+          if (body.action.type === 'createCard') {
+            eventBody.content = card.desc
+          }
+        } else {
+          eventBody.id = parsedCard.groups.id
         }
-      } else {
-        eventBody.id = parsedCard.groups.id
+      } else if (body.action.type === 'createCard') {
+        eventBody.content = card.desc
       }
     }
 
@@ -182,8 +189,14 @@ http.createServer(async (req, res) => {
         eventBody.content = parsedComment[1]
       }
     } else if (body.action.type === 'updateCard') {
-      if (card.closed) {
+      if (body.action.data.old === undefined || body.action.data.card === undefined) {
+        sendResponse(400, 'Event not indexed.')
+        return
+      }
+      if (!body.action.data.old.closed && body.action.data.card.closed) {
         eventBody.kind = 'archive'
+      } else if (body.action.data.old.closed && !body.action.data.card.closed) {
+        eventBody.kind = 'unarchive'
       } else {
         sendResponse(400, 'Event not indexed.')
         return

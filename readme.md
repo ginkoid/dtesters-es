@@ -63,7 +63,7 @@ Send a `GET` request to `/dtesters/total` with some of the querystring parameter
 
 ## Running your own
 
-Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `events`. The index's mappings and settings are in `index.json`.
+Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `event`. The index's mappings and settings are in `index.json`.
 
 * `app.js` will
   * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time
