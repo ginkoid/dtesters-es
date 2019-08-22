@@ -427,6 +427,6 @@ http.createServer(async (req, res) => {
     sendResponse(404, 'The request endpoint is invalid.')
     return
   }
-}).listen(8001, () => {
+}).listen(8001, '127.0.0.1', () => {
   console.log('listening on port 8001')
 })
