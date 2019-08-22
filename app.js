@@ -15,7 +15,7 @@ const trelloDabbitId = process.env.APP_TRELLO_DABBIT_ID
 const termFields = ['board', 'card', 'link', 'id', 'kind', 'user', 'admin_user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
 const ingestIndexName = 'events'
-const searchIndexName = 'event'
+const searchIndexName = 'events'
 const requestKinds = {
   search: 0,
   total: 1,
@@ -314,7 +314,7 @@ http.createServer(async (req, res) => {
       musts.push({
         simple_query_string: {
           query: params.get('query'),
-          fields: [...matchFields, ...termFields],
+          fields: matchFields,
           default_operator: 'AND',
           flags: 'AND|ESCAPE|NOT|OR|PHRASE|PRECEDENCE|PREFIX|WHITESPACE',
           lenient: true,
