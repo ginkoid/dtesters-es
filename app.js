@@ -12,9 +12,9 @@ const trelloWebhook = Buffer.from(process.env.APP_TRELLO_WEBHOOK)
 const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
 const trelloDabbitId = process.env.APP_TRELLO_DABBIT_ID
 
-const termFields = ['board', 'card', 'link', 'id', 'kind', 'user']
+const termFields = ['board', 'card', 'link', 'id', 'kind', 'user', 'admin_user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
-const ingestIndexName = 'event'
+const ingestIndexName = 'events'
 const searchIndexName = 'event'
 const requestKinds = {
   search: 0,
@@ -131,6 +131,8 @@ http.createServer(async (req, res) => {
 
     let parsedCard
 
+    const automatedUser = body.action.idMemberCreator === trelloBugBotId || body.action.idMemberCreator === trelloDabbitId
+
     if (body.action.data.board !== undefined) {
       eventBody.board = body.action.data.board.id
     }
@@ -143,7 +145,7 @@ http.createServer(async (req, res) => {
         sendResponse(400, 'Event not indexed.')
         return
       }
-      if (body.action.memberCreator.id === trelloBugBotId || body.action.memberCreator.id === trelloDabbitId) {
+      if (automatedUser) {
         parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
         if (parsedCard === null) {
           if (body.action.type === 'createCard') {
@@ -168,25 +170,41 @@ http.createServer(async (req, res) => {
         eventBody.client = parsedCard.groups.client
         eventBody.system = parsedCard.groups.system
       }
-    } else if (body.action.type === 'addAttachmentToCard') {
-      eventBody.kind = 'attach'
-      eventBody.user = body.action.data.attachment.name
-    } else if (body.action.type === 'commentCard') {
-      const parsedComment = body.action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
-      if (parsedComment === null) {
-        sendResponse(400, 'Event not indexed.')
-        return
+      if (!automatedUser) {
+        eventBody.admin_user = body.action.idMemberCreator
       }
-      eventBody.user = parsedComment[2]
-      if (parsedComment[1].startsWith('Can reproduce.\n')) {
-        eventBody.kind = 'cr'
-        eventBody.content = parsedComment[1].replace('Can reproduce.\n', '')
-      } else if (body.action.data.text.startsWith('Can\'t reproduce.\n')) {
-        eventBody.kind = 'cnr'
-        eventBody.content = parsedComment[1].replace('Can\'t reproduce.\n', '')
+    } else if (body.action.type === 'addAttachmentToCard') {
+      if (automatedUser) {
+        eventBody.kind = 'attach'
+        eventBody.user = body.action.data.attachment.name
       } else {
-        eventBody.kind = 'note'
-        eventBody.content = parsedComment[1]
+        eventBody.kind = 'admin_attach'
+        eventBody.admin_user = body.action.idMemberCreator
+      }
+    } else if (body.action.type === 'commentCard') {
+      if (automatedUser) {
+        const parsedComment = body.action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
+        if (parsedComment === null) {
+          eventBody.kind = 'admin_note'
+          eventBody.content = body.action.data.text
+          eventBody.admin_user = body.action.idMemberCreator
+        } else {
+          eventBody.user = parsedComment[2]
+          if (parsedComment[1].startsWith('Can reproduce.\n')) {
+            eventBody.kind = 'cr'
+            eventBody.content = parsedComment[1].replace('Can reproduce.\n', '')
+          } else if (body.action.data.text.startsWith('Can\'t reproduce.\n')) {
+            eventBody.kind = 'cnr'
+            eventBody.content = parsedComment[1].replace('Can\'t reproduce.\n', '')
+          } else {
+            eventBody.kind = 'note'
+            eventBody.content = parsedComment[1]
+          }
+        }
+      } else {
+        eventBody.kind = 'admin_note'
+        eventBody.content = body.action.data.text
+        eventBody.admin_user = body.action.idMemberCreator
       }
     } else if (body.action.type === 'updateCard') {
       if (body.action.data.old === undefined || body.action.data.card === undefined) {

@@ -45,6 +45,9 @@
       "user": {
         "type": "keyword"
       },
+      "admin_user": {
+        "type": "keyword"
+      },
       "title": {
         "type": "text",
         "analyzer": "app_english"

@@ -1,6 +1,6 @@
 # DTesters Elasticsearch
 
-#### The API is hosted for anyone to use at `https://gnk.gnk.io`
+### The API is hosted for everyone to use at `https://gnk.gnk.io`
 
 An API for ingesting and searching Discord Testers data.
 
@@ -57,13 +57,13 @@ Send a `GET` request to `/dtesters/total` with some of the querystring parameter
 * `before` (optional): Only include events before this time. Accepts seconds since Jan 1 1970.
 * `after` (optional): Only include events after this time. Accepts seconds since Jan 1 1970.
 * `include` (optional): The list of event attributes to include in the response. If this isn't provided, all attributes are included.
-* terms `board`, `card`, `link`, `id`, `kind`, `user` (optional): Providing these attributes will filter based on the exact values provided. Partial matches are not possible
+* terms `board`, `card`, `link`, `id`, `kind`, `user`, `admin_user` (optional): Providing these attributes will filter based on the exact values provided. Partial matches are not possible
 * `content` (optional): Providing this parameter will search based on the `actual`, `client`, `content`, `expected`, `steps`, `system`, `title`. Supports partial matches.
 * `query` (optional): Providing this parameter will search based on all include and all content attrbutes, using the [elasticsearch simple query syntax](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-simple-query-string-query.html#simple-query-string-syntax)
 
 ## Running your own
 
-Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `event`. The index's mappings and settings are in `index.json`.
+Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `events`. The index's mappings and settings are in `index.json`.
 
 * `app.js` will
   * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time

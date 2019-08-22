@@ -9,7 +9,7 @@ const board = process.env.APP_TRELLO_BOARD
 const startDate = process.env.APP_TRELLO_START_DATE
 const endDate = process.env.APP_TRELLO_END_DATE
 
-const indexName = 'event'
+const indexName = 'events'
 
 if (board === undefined) {
   throw new Error('APP_TRELLO_BOARD is not defined')
@@ -62,6 +62,8 @@ const importEvent = async (action) => {
 
   let parsedCard
 
+  const automatedUser = action.idMemberCreator === trelloBugBotId || action.idMemberCreator === trelloDabbitId
+
   if (action.data.board !== undefined) {
     eventBody.board = action.data.board.id
   }
@@ -73,7 +75,7 @@ const importEvent = async (action) => {
     if (card instanceof Error) {
       return
     }
-    if (action.memberCreator.id === trelloBugBotId || action.memberCreator.id === trelloDabbitId) {
+    if (automatedUser) {
       parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
       if (parsedCard === null) {
         if (action.type === 'createCard') {
@@ -98,24 +100,41 @@ const importEvent = async (action) => {
       eventBody.client = parsedCard.groups.client
       eventBody.system = parsedCard.groups.system
     }
-  } else if (action.type === 'addAttachmentToCard') {
-    eventBody.kind = 'attach'
-    eventBody.user = action.data.attachment.name
-  } else if (action.type === 'commentCard') {
-    const parsedComment = action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
-    if (parsedComment === null) {
-      return
+    if (!automatedUser) {
+      eventBody.admin_user = action.idMemberCreator
     }
-    eventBody.user = parsedComment[2]
-    if (parsedComment[1].startsWith('Can reproduce.\n')) {
-      eventBody.kind = 'cr'
-      eventBody.content = parsedComment[1].replace('Can reproduce.\n', '')
-    } else if (action.data.text.startsWith('Can\'t reproduce.\n')) {
-      eventBody.kind = 'cnr'
-      eventBody.content = parsedComment[1].replace('Can\'t reproduce.\n', '')
+  } else if (action.type === 'addAttachmentToCard') {
+    if (automatedUser) {
+      eventBody.kind = 'attach'
+      eventBody.user = action.data.attachment.name
     } else {
-      eventBody.kind = 'note'
-      eventBody.content = parsedComment[1]
+      eventBody.kind = 'admin_attach'
+      eventBody.admin_user = action.idMemberCreator
+    }
+  } else if (action.type === 'commentCard') {
+    if (automatedUser) {
+      const parsedComment = action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
+      if (parsedComment === null) {
+        eventBody.kind = 'admin_note'
+        eventBody.content = action.data.text
+        eventBody.admin_user = action.idMemberCreator
+      } else {
+        eventBody.user = parsedComment[2]
+        if (parsedComment[1].startsWith('Can reproduce.\n')) {
+          eventBody.kind = 'cr'
+          eventBody.content = parsedComment[1].replace('Can reproduce.\n', '')
+        } else if (action.data.text.startsWith('Can\'t reproduce.\n')) {
+          eventBody.kind = 'cnr'
+          eventBody.content = parsedComment[1].replace('Can\'t reproduce.\n', '')
+        } else {
+          eventBody.kind = 'note'
+          eventBody.content = parsedComment[1]
+        }
+      }
+    } else {
+      eventBody.kind = 'admin_note'
+      eventBody.content = action.data.text
+      eventBody.admin_user = action.idMemberCreator
     }
   } else if (action.type === 'updateCard') {
     if (action.data.old === undefined || action.data.card === undefined) {
@@ -140,7 +159,16 @@ const importEvent = async (action) => {
 
 const importChunk = async (before) => {
   console.log('importing chunk before', before)
-  const actions = JSON.parse((await got(`https://api.trello.com/1/boards/${board}/actions/?limit=1000&filter=createCard,commentCard,updateCard,addAttachmentToCard&before=${before}`)).body)
+  let actions
+  const tryRequest = async () => {
+    try {
+      actions = JSON.parse((await got(`https://api.trello.com/1/boards/${board}/actions/?limit=1000&filter=createCard,commentCard,updateCard,addAttachmentToCard&before=${before}`)).body)
+    } catch (e) {
+      console.log('retrying failed chunk before', before)
+      await tryRequest()
+    }
+  }
+  await tryRequest()
   await pMap(actions, async (action) => {
     await importEvent(action)
   }, { concurrency: 50 })
