@@ -324,6 +324,7 @@ http.createServer(async (req, res) => {
 
     let sort
     let includeKeys
+    let highlightsParam
     const highlightsFields = {}
 
     if (requestKind === requestKinds.search) {
@@ -344,16 +345,16 @@ http.createServer(async (req, res) => {
         includeKeys = includeParam.split(',')
       }
 
-      let highlights = params.get('highlights')
-      if (highlights === null) {
-        highlights = 'all'
+      highlightsParam = params.get('highlights')
+      if (highlightsParam === null) {
+        highlightsParam = 'all'
       }
-      if (!['all', 'first', 'none'].includes(highlights)) {
+      if (!['all', 'first', 'none'].includes(highlightsParam)) {
         sendResponse(400, 'The highlights option is invalid.')
         return
       }
 
-      if (highlights === 'all' || highlights === 'first') {
+      if (highlightsParam === 'all' || highlightsParam === 'first') {
         matchFields.forEach((field) => {
           highlightsFields[field] = {}
         })
@@ -414,12 +415,12 @@ http.createServer(async (req, res) => {
           const highlight = hit.highlight || {}
           const highlightResult = []
           let hightlightEntries = Object.entries(highlight)
-          if (highlight === 'first' && hightlightEntries.length > 0) {
+          if (highlightsParam === 'first' && hightlightEntries.length > 0) {
             hightlightEntries = [hightlightEntries[0]]
           }
           hightlightEntries.forEach(([key, highlightsValue]) => {
             let highlights = highlightsValue
-            if (highlight === 'first' && highlights.length > 0) {
+            if (highlightsParam === 'first' && highlights.length > 0) {
               highlights = [highlights[0]]
             }
             highlights.forEach((text) => {
