@@ -15,7 +15,8 @@
         "type": "keyword"
       },
       "client": {
-        "type": "text"
+        "type": "text",
+        "analyzer": "app_english"
       },
       "content": {
         "type": "text",
@@ -36,7 +37,8 @@
         "analyzer": "app_english"
       },
       "system": {
-        "type": "text"
+        "type": "text",
+        "analyzer": "app_english"
       },
       "time": {
         "type": "date",

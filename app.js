@@ -14,8 +14,8 @@ const trelloDabbitId = process.env.APP_TRELLO_DABBIT_ID
 
 const termFields = ['board', 'card', 'link', 'id', 'kind', 'user', 'admin_user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
-const ingestIndexName = 'events'
-const searchIndexName = 'events'
+const ingestIndexName = 'event'
+const searchIndexName = 'event'
 const requestKinds = {
   search: 0,
   total: 1,
@@ -145,16 +145,11 @@ http.createServer(async (req, res) => {
         sendResponse(400, 'Event not indexed.')
         return
       }
-      if (automatedUser) {
-        parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
-        if (parsedCard === null) {
-          if (body.action.type === 'createCard') {
-            eventBody.content = card.desc
-          }
-        } else {
-          eventBody.id = parsedCard.groups.id
-        }
-      } else if (body.action.type === 'createCard') {
+      parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
+      if (parsedCard !== null) {
+        eventBody.id = parsedCard.groups.id
+      }
+      if ((!automatedUser || parsedCard === null) && body.action.type === 'createCard') {
         eventBody.content = card.desc
       }
     }
@@ -182,34 +177,31 @@ http.createServer(async (req, res) => {
         eventBody.admin_user = body.action.idMemberCreator
       }
     } else if (body.action.type === 'commentCard') {
-      if (automatedUser) {
-        const parsedComment = body.action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
-        if (parsedComment === null) {
-          eventBody.kind = 'admin_note'
-          eventBody.content = body.action.data.text
-          eventBody.admin_user = body.action.idMemberCreator
-        } else {
-          eventBody.user = parsedComment[2]
-          if (parsedComment[1].startsWith('Can reproduce.\n')) {
-            eventBody.kind = 'cr'
-            eventBody.content = parsedComment[1].replace('Can reproduce.\n', '')
-          } else if (body.action.data.text.startsWith('Can\'t reproduce.\n')) {
-            eventBody.kind = 'cnr'
-            eventBody.content = parsedComment[1].replace('Can\'t reproduce.\n', '')
-          } else {
-            eventBody.kind = 'note'
-            eventBody.content = parsedComment[1]
-          }
-        }
-      } else {
+      const parsedComment = body.action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
+      if (!automatedUser || parsedComment === null) {
         eventBody.kind = 'admin_note'
         eventBody.content = body.action.data.text
         eventBody.admin_user = body.action.idMemberCreator
+      } else {
+        eventBody.user = parsedComment[2]
+        if (parsedComment[1].startsWith('Can reproduce.\n')) {
+          eventBody.kind = 'cr'
+          eventBody.content = parsedComment[1].replace('Can reproduce.\n', '')
+        } else if (body.action.data.text.startsWith('Can\'t reproduce.\n')) {
+          eventBody.kind = 'cnr'
+          eventBody.content = parsedComment[1].replace('Can\'t reproduce.\n', '')
+        } else {
+          eventBody.kind = 'note'
+          eventBody.content = parsedComment[1]
+        }
       }
     } else if (body.action.type === 'updateCard') {
       if (body.action.data.old === undefined || body.action.data.card === undefined) {
         sendResponse(400, 'Event not indexed.')
         return
+      }
+      if (!automatedUser) {
+        eventBody.admin_user = body.action.idMemberCreator
       }
       if (!body.action.data.old.closed && body.action.data.card.closed) {
         eventBody.kind = 'archive'
@@ -226,6 +218,7 @@ http.createServer(async (req, res) => {
 
     await elastic.index({
       index: ingestIndexName,
+      id: body.action.id,
       body: eventBody,
     })
 
@@ -255,7 +248,7 @@ http.createServer(async (req, res) => {
 
     if (requestKind === requestKinds.search) {
       limit = parseInt(params.get('limit'))
-      if (Number.isNaN(limit) || limit < 0 || limit > 50) {
+      if (Number.isNaN(limit) || limit < 1 || limit > 50) {
         sendResponse(400, 'The limit is invalid.')
         return
       }
@@ -298,7 +291,7 @@ http.createServer(async (req, res) => {
     const afterParam = params.get('after')
     if (afterParam !== null) {
       const after = parseInt(afterParam)
-      if (Number.isNaN(after) || after < 0 || after > before) {
+      if (Number.isNaN(after) || after < 0 || (before !== undefined && after > before)) {
         sendResponse(400, 'The after is invalid.')
         return
       }
@@ -331,7 +324,7 @@ http.createServer(async (req, res) => {
 
     let sort
     let includeKeys
-    const highlightFields = {}
+    const highlightsFields = {}
 
     if (requestKind === requestKinds.search) {
       if (params.get('sort') === 'relevance') {
@@ -351,9 +344,20 @@ http.createServer(async (req, res) => {
         includeKeys = includeParam.split(',')
       }
 
-      matchFields.forEach((field) => {
-        highlightFields[field] = {}
-      })
+      let highlights = params.get('highlights')
+      if (highlights === null) {
+        highlights = 'all'
+      }
+      if (!['all', 'first', 'none'].includes(highlights)) {
+        sendResponse(400, 'The highlights option is invalid.')
+        return
+      }
+
+      if (highlights === 'all' || highlights === 'first') {
+        matchFields.forEach((field) => {
+          highlightsFields[field] = {}
+        })
+      }
     }
 
     const query = {
@@ -381,7 +385,7 @@ http.createServer(async (req, res) => {
               boundary_scanner_locale: 'en-US',
               encoder: 'html',
               order: 'score',
-              fields: highlightFields,
+              fields: highlightsFields,
             },
           },
           index: searchIndexName,
@@ -409,7 +413,15 @@ http.createServer(async (req, res) => {
         hits: result.body.hits.hits.map(hit => {
           const highlight = hit.highlight || {}
           const highlightResult = []
-          Object.entries(highlight).forEach(([key, highlights]) => {
+          let hightlightEntries = Object.entries(highlight)
+          if (highlight === 'first' && hightlightEntries.length > 0) {
+            hightlightEntries = [hightlightEntries[0]]
+          }
+          hightlightEntries.forEach(([key, highlightsValue]) => {
+            let highlights = highlightsValue
+            if (highlight === 'first' && highlights.length > 0) {
+              highlights = [highlights[0]]
+            }
             highlights.forEach((text) => {
               const positions = findEms(he.decode(text))
               highlightResult.push({
@@ -446,5 +458,5 @@ http.createServer(async (req, res) => {
     return
   }
 }).listen(8001, '127.0.0.1', () => {
-  console.log('listening on port 8001')
+  console.log('listening on 127.0.0.1:8001')
 })

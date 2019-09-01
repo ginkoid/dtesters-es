@@ -5,15 +5,11 @@ const { Client: ElasticClient } = require('@elastic/elasticsearch')
 
 const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
 const trelloDabbitId = process.env.APP_TRELLO_DABBIT_ID
-const board = process.env.APP_TRELLO_BOARD
+const boards = process.env.APP_TRELLO_BOARDS.split(',')
 const startDate = process.env.APP_TRELLO_START_DATE
 const endDate = process.env.APP_TRELLO_END_DATE
 
-const indexName = 'events'
-
-if (board === undefined) {
-  throw new Error('APP_TRELLO_BOARD is not defined')
-}
+const indexName = 'event'
 
 if (startDate === undefined) {
   throw new Error('APP_TRELLO_START_DATE is not defined')
@@ -75,16 +71,11 @@ const importEvent = async (action) => {
     if (card instanceof Error) {
       return
     }
-    if (automatedUser) {
-      parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
-      if (parsedCard === null) {
-        if (action.type === 'createCard') {
-          eventBody.content = card.desc
-        }
-      } else {
-        eventBody.id = parsedCard.groups.id
-      }
-    } else if (action.type === 'createCard') {
+    parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
+    if (parsedCard !== null) {
+      eventBody.id = parsedCard.groups.id
+    }
+    if ((!automatedUser || parsedCard === null) && action.type === 'createCard') {
       eventBody.content = card.desc
     }
   }
@@ -112,33 +103,30 @@ const importEvent = async (action) => {
       eventBody.admin_user = action.idMemberCreator
     }
   } else if (action.type === 'commentCard') {
-    if (automatedUser) {
-      const parsedComment = action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
-      if (parsedComment === null) {
-        eventBody.kind = 'admin_note'
-        eventBody.content = action.data.text
-        eventBody.admin_user = action.idMemberCreator
-      } else {
-        eventBody.user = parsedComment[2]
-        if (parsedComment[1].startsWith('Can reproduce.\n')) {
-          eventBody.kind = 'cr'
-          eventBody.content = parsedComment[1].replace('Can reproduce.\n', '')
-        } else if (action.data.text.startsWith('Can\'t reproduce.\n')) {
-          eventBody.kind = 'cnr'
-          eventBody.content = parsedComment[1].replace('Can\'t reproduce.\n', '')
-        } else {
-          eventBody.kind = 'note'
-          eventBody.content = parsedComment[1]
-        }
-      }
-    } else {
+    const parsedComment = action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
+    if (!automatedUser || parsedComment === null) {
       eventBody.kind = 'admin_note'
       eventBody.content = action.data.text
       eventBody.admin_user = action.idMemberCreator
+    } else {
+      eventBody.user = parsedComment[2]
+      if (parsedComment[1].startsWith('Can reproduce.\n')) {
+        eventBody.kind = 'cr'
+        eventBody.content = parsedComment[1].replace('Can reproduce.\n', '')
+      } else if (action.data.text.startsWith('Can\'t reproduce.\n')) {
+        eventBody.kind = 'cnr'
+        eventBody.content = parsedComment[1].replace('Can\'t reproduce.\n', '')
+      } else {
+        eventBody.kind = 'note'
+        eventBody.content = parsedComment[1]
+      }
     }
   } else if (action.type === 'updateCard') {
     if (action.data.old === undefined || action.data.card === undefined) {
       return
+    }
+    if (!automatedUser) {
+      eventBody.admin_user = action.idMemberCreator
     }
     if (!action.data.old.closed && action.data.card.closed) {
       eventBody.kind = 'archive'
@@ -153,11 +141,12 @@ const importEvent = async (action) => {
 
   await elastic.index({
     index: indexName,
+    id: action.id,
     body: eventBody,
   })
 }
 
-const importChunk = async (before) => {
+const importChunk = async (before, board) => {
   console.log('importing chunk before', before)
   let actions
   const tryRequest = async () => {
@@ -180,4 +169,7 @@ const importChunk = async (before) => {
   }
 }
 
-importChunk(startDate)
+
+boards.forEach((board) => {
+  importChunk(startDate, board)
+})

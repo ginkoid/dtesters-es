@@ -51,19 +51,20 @@ Send a `GET` request to [`/dtesters/total`](https://gnk.gnk.io/dtesters/total) w
 
 ## Parameters for `search` and `total`
 
-* `limit` (required) (`search` only): The number of results on a page. Maximum of `50`.
+* `limit` (required) (`search` only): The number of results on a page. Maximum of `50`. Minimum of `1`.
 * `page` (required) (`search` only): The page index for pagination. Starts at `0`. Maximum of `100`.
 * `sort` (required) (`search` only): Specifies the sort that the results will use. Either `recency` or `relevance`.
 * `before` (optional): Only include events before this time. Accepts seconds since Jan 1 1970.
 * `after` (optional): Only include events after this time. Accepts seconds since Jan 1 1970.
 * `include` (optional): The list of event attributes to include in the response. If this isn't provided, all attributes are included.
+* `highlight` (optional): Specifies how to include highlights in the response. Either `all`, `first`, or `none`. Defaults to `all`.
 * terms `board`, `card`, `link`, `id`, `kind`, `user`, `admin_user` (optional): Providing these attributes will filter based on the exact values provided. Partial matches are not possible
 * `content` (optional): Providing this parameter will search based on the `actual`, `client`, `content`, `expected`, `steps`, `system`, `title`. Supports partial matches.
 * `query` (optional): Providing this parameter will search based on all content attrbutes, using a subset of the [elasticsearch simple query syntax](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-simple-query-string-query.html#simple-query-string-syntax)
 
 ## Running your own
 
-Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `events`. The index's mappings and settings are in `index.json`.
+Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `event`. The index's mappings and settings are in `index.json`.
 
 * `app.js` will
   * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time
