@@ -6,7 +6,7 @@
   "private": true,
   "dependencies": {
     "@elastic/elasticsearch": "^7.3.0",
-    "dotenv": "^8.0.0",
+    "dotenv": "^8.1.0",
     "got": "^9.6.0",
     "he": "^1.2.0",
     "p-map": "^3.0.0",

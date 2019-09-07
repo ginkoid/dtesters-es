@@ -64,15 +64,16 @@ Send a `GET` request to [`/dtesters/total`](https://gnk.gnk.io/dtesters/total) w
 
 ## Running your own
 
-Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index called `event`. The index's mappings and settings are in `index.json`.
+Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index. The index's mappings and settings are in `index.json`.
 
 * `app.js` will
   * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time
   * serve search requests from elasticsearch for `/dtesters/search`
 
 * `import.js` will bulk ingest historical events from Trello into elasticsearch. Because of how the Trello API works, events are indexed in reverse order.
-  * Define the `APP_TRELLO_BOARD` environment variable to be the trello ID of the board which you want to ingest.
+  * Define the `APP_TRELLO_BOARDS` environment variable to be the trello IDs of the boards which you want to ingest, joined with `,`s.
   * Define the `APP_TRELLO_START_DATE` environment variable to the ISO8601 date where you want to start importing. Importing will go back from this date to the beginning of Trello activity, or to `APP_TRELLO_END_DATE`, whichever is earliest.
   * (optional) Define the `APP_TRELLO_END_DATE` environment variable to ISO8601 date of when you want to end importing. This should be an earlier time than `APP_TRELLO_START_DATE`.
+  * (optional) Define the `APP_REQUEST_IPS` environment variable to the list of IPs that your machine has, joined with `,`s. This is used to increase ratelimits with the Trello API.
 
 Both of the scripts will need variables defined in a `.env` file. An example `.env` is in `.env.example`.

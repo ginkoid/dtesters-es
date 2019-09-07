@@ -3,19 +3,38 @@ const got = require('got')
 const pMap = require('p-map')
 const { Client: ElasticClient } = require('@elastic/elasticsearch')
 
-const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
-const trelloDabbitId = process.env.APP_TRELLO_DABBIT_ID
+const trelloAutomatedIds = process.env.APP_TRELLO_AUTOMATED_IDS.split(',')
 const boards = process.env.APP_TRELLO_BOARDS.split(',')
 const startDate = process.env.APP_TRELLO_START_DATE
 const endDate = process.env.APP_TRELLO_END_DATE
 
-const indexName = 'event'
+const indexName = process.env.APP_ELASTIC_INGEST_INDEX
+const ipsParam = process.env.APP_IPS
+let ips = null
+if (ipsParam !== undefined) {
+  ips = ipsParam.split(',')
+}
 
 if (startDate === undefined) {
   throw new Error('APP_TRELLO_START_DATE is not defined')
 }
 
 const wait = (time) => new Promise((resolve) => setTimeout(() => resolve(), time))
+
+let currentIpIdx = -1
+
+const getGotOptions = () => {
+  if (ips === null) {
+    return {}
+  }
+  currentIpIdx++
+  if (currentIpIdx === ips.length) {
+    currentIpIdx = 0
+  }
+  return {
+    localAddress: ips[currentIpIdx],
+  }
+}
 
 const cardCache = new Map()
 
@@ -26,7 +45,7 @@ const requestCard = async (id) => {
   }
   let res
   try {
-    res = await got(`https://api.trello.com/1/cards/${id}`)
+    res = await got(`https://api.trello.com/1/cards/${id}`, getGotOptions())
   } catch (e) {
     if (e instanceof got.HTTPError && (e.response.statusCode === 404 || e.response.statusCode === 401)) {
       return e
@@ -58,7 +77,7 @@ const importEvent = async (action) => {
 
   let parsedCard
 
-  const automatedUser = action.idMemberCreator === trelloBugBotId || action.idMemberCreator === trelloDabbitId
+  const automatedUser = trelloAutomatedIds.includes(action.idMemberCreator)
 
   if (action.data.board !== undefined) {
     eventBody.board = action.data.board.id
@@ -71,7 +90,7 @@ const importEvent = async (action) => {
     if (card instanceof Error) {
       return
     }
-    parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
+    parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n(?<id>[0-9]+)?\n?$/is)
     if (parsedCard !== null) {
       eventBody.id = parsedCard.groups.id
     }
@@ -147,29 +166,34 @@ const importEvent = async (action) => {
 }
 
 const importChunk = async (before, board) => {
-  console.log('importing chunk before', before)
+  console.log('importing chunk before', before, 'on board', board)
   let actions
   const tryRequest = async () => {
     try {
-      actions = JSON.parse((await got(`https://api.trello.com/1/boards/${board}/actions/?limit=1000&filter=createCard,commentCard,updateCard,addAttachmentToCard&before=${before}`)).body)
+      actions = JSON.parse((await got(
+        `https://api.trello.com/1/boards/${board}/actions/?limit=1000&filter=createCard,commentCard,updateCard,addAttachmentToCard&before=${before}`,
+        getGotOptions(),
+      )).body)
     } catch (e) {
-      console.log('retrying failed chunk before', before)
+      await wait(5000)
+      console.log('retrying failed chunk before', before, 'on board', board)
       await tryRequest()
     }
   }
   await tryRequest()
   await pMap(actions, async (action) => {
     await importEvent(action)
-  }, { concurrency: 50 })
+  }, { concurrency: 100 })
   if (endDate !== undefined && (new Date(actions[actions.length - 1].date)) < (new Date(endDate))) {
     return
   }
   if (actions.length === 1000) {
-    await importChunk(actions[999].id)
+    await importChunk(actions[999].id, board)
   }
 }
 
-
-boards.forEach((board) => {
-  importChunk(startDate, board)
-})
+;(async () => {
+  for (let i = 0; i < boards.length; i++) {
+    await importChunk(startDate, boards[i])
+  }
+})()

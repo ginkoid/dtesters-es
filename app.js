@@ -8,14 +8,13 @@ const getRawBody = promisify(require('raw-body'))
 const { Client: ElasticClient } = require('@elastic/elasticsearch')
 
 const trelloSecret = process.env.APP_TRELLO_SECRET
-const trelloWebhook = Buffer.from(process.env.APP_TRELLO_WEBHOOK)
-const trelloBugBotId = process.env.APP_TRELLO_BUG_BOT_ID
-const trelloDabbitId = process.env.APP_TRELLO_DABBIT_ID
+const trelloWebhookUrl = Buffer.from(process.env.APP_TRELLO_WEBHOOK_URL)
+const trelloAutomatedIds = process.env.APP_TRELLO_AUTOMATED_IDS.split(',')
 
 const termFields = ['board', 'card', 'link', 'id', 'kind', 'user', 'admin_user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
-const ingestIndexName = 'event'
-const searchIndexName = 'event'
+const ingestIndexName = process.env.APP_ELASTIC_INGEST_INDEX
+const searchIndexName = process.env.APP_ELASTIC_SEARCH_INDEX
 const requestKinds = {
   search: 0,
   total: 1,
@@ -113,17 +112,18 @@ http.createServer(async (req, res) => {
 
     const calculatedDigest = crypto
       .createHmac('sha1', trelloSecret)
-      .update(Buffer.concat([rawBody, trelloWebhook]))
+      .update(Buffer.concat([rawBody, trelloWebhookUrl]))
       .digest()
     try {
       if (Buffer.compare(Buffer.from(req.headers['x-trello-webhook'], 'base64'), calculatedDigest) !== 0) {
-        sendResponse(403, 'The request does not have correct authentication.')
-        return
+        throw 0
       }
     } catch (e) {
-      sendResponse(401, 'The request is not authenticated.')
+      sendResponse(403, 'The request is not correctly authenticated.')
       return
     }
+
+    sendResponse(200, 'Event received.')
 
     const eventBody = {
       time: Math.floor((new Date(body.action.date)).valueOf() / 1000),
@@ -131,7 +131,7 @@ http.createServer(async (req, res) => {
 
     let parsedCard
 
-    const automatedUser = body.action.idMemberCreator === trelloBugBotId || body.action.idMemberCreator === trelloDabbitId
+    const automatedUser = trelloAutomatedIds.includes(body.action.idMemberCreator)
 
     if (body.action.data.board !== undefined) {
       eventBody.board = body.action.data.board.id
@@ -142,10 +142,9 @@ http.createServer(async (req, res) => {
       eventBody.link = body.action.data.card.shortLink
       card = await requestCard(body.action.data.card.id)
       if (card instanceof Error) {
-        sendResponse(400, 'Event not indexed.')
         return
       }
-      parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
+      parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n(?<id>[0-9]+)?\n?$/is)
       if (parsedCard !== null) {
         eventBody.id = parsedCard.groups.id
       }
@@ -197,7 +196,6 @@ http.createServer(async (req, res) => {
       }
     } else if (body.action.type === 'updateCard') {
       if (body.action.data.old === undefined || body.action.data.card === undefined) {
-        sendResponse(400, 'Event not indexed.')
         return
       }
       if (!automatedUser) {
@@ -208,11 +206,9 @@ http.createServer(async (req, res) => {
       } else if (body.action.data.old.closed && !body.action.data.card.closed) {
         eventBody.kind = 'unarchive'
       } else {
-        sendResponse(400, 'Event not indexed.')
         return
       }
     } else {
-      sendResponse(400, 'Event not indexed.')
       return
     }
 
@@ -221,8 +217,6 @@ http.createServer(async (req, res) => {
       id: body.action.id,
       body: eventBody,
     })
-
-    sendResponse(200, 'Event indexed.')
   } else if (splitUrl[0] === '/dtesters/search' || splitUrl[0] === '/dtesters/total') {
     let requestKind
     if (splitUrl[0] === '/dtesters/search') {
@@ -309,7 +303,6 @@ http.createServer(async (req, res) => {
           query: params.get('query'),
           fields: matchFields,
           default_operator: 'AND',
-          flags: 'AND|ESCAPE|NOT|OR|PHRASE|PRECEDENCE|PREFIX|WHITESPACE',
           lenient: true,
         },
       })
@@ -318,6 +311,8 @@ http.createServer(async (req, res) => {
         multi_match: {
           query: params.get('content'),
           fields: matchFields,
+          operator: 'AND',
+          fuzziness: 'AUTO',
         },
       })
     }
