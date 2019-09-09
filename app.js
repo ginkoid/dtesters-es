@@ -267,7 +267,7 @@ http.createServer(async (req, res) => {
       }
     })
     const beforeParam = params.get('before')
-    let before = 0
+    let before
     if (beforeParam !== null) {
       before = parseInt(beforeParam)
       if (Number.isNaN(before) || before < 0) {
