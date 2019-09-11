@@ -1,8 +1,32 @@
 # DTesters Elasticsearch
 
+An API for ingesting and searching Discord Testers data.
+
 ### The API is hosted for everyone to use at [`https://gnk.gnk.io`](https://gnk.gnk.io)
 
-An API for ingesting and searching Discord Testers data.
+## Examples
+
+* [`/dtesters/total`](https://gnk.gnk.io/dtesters/total)
+  * Find the total number of events in the system.
+* [`/dtesters/total?board=5771673855f47b547f2decc3&kind=approve`](https://gnk.gnk.io/dtesters/total?board=5771673855f47b547f2decc3&kind=approve)
+  * Find the total number of approved desktop bugs.
+* [`/dtesters/search?limit=10&page=0&sort=recency`](https://gnk.gnk.io/dtesters/search?limit=10&page=0&sort=recency)
+  * Find the 10 most recent events in the system.
+* [`/dtesters/search?limit=10&page=0&sort=recency&kind=approve`](https://gnk.gnk.io/dtesters/search?limit=10&page=0&sort=recency&kind=approve)
+  * Find the 10 most recent approved bugs.
+* [`/dtesters/search?limit=10&page=0&sort=recency&id=42024`](https://gnk.gnk.io/dtesters/search?limit=10&page=0&sort=recency&id=42024):
+  * Find the 10 most recent events pertaining to bug report ID 42024.
+* [`/dtesters/search?limit=10&page=0&sort=relevance&kind=approve&content=modal`](https://gnk.gnk.io/dtesters/search?limit=10&page=0&sort=relevance&content=modal)
+  * Find the 10 most relevant bugs regarding modals.
+* [`/dtesters/search?limit=10&page=0&sort=relevance&kind=approve&content=modal&include=link,title`](https://gnk.gnk.io/dtesters/search?limit=10&page=0&sort=relevance&kind=approve&content=modal&include=link,title) 
+  * Find the 10 most relevant bugs regarding modals.
+  * Filter the response attributes to only include the Trello card link and the card title.
+* [`/dtesters/search?limit=10&page=0&sort=relevance&kind=approve&content=modal&include=link,title&board=5771673855f47b547f2decc3&highlights=first`](https://gnk.gnk.io/dtesters/search?limit=10&page=0&sort=relevance&kind=approve&content=modal&board=5771673855f47b547f2decc3&include=link,title&highlights=first)
+  * Find the 10 most relevant desktop bugs regarding modals.
+  * Filter the response attribites to only include the Trello card link and the card title.
+  * Filter the response to only include a highlighted snippet for the most relevant section.
+* [`/dtesters/search?limit=10&page=0&sort=relevance&kind=approve&query=modal -button`](https://gnk.gnk.io/dtesters/search?limit=10&page=0&sort=relevance&kind=approve&query=modal%20-button)
+  * Find the 10 most relevant bugs regarding modals but not buttons.
 
 ## Using the `search` API
 
@@ -32,7 +56,7 @@ Send a `GET` request to [`/dtesters/search`](https://gnk.gnk.io/dtesters/search)
 }
 ```
 
-* `total.relation` can be either `eq` or `gte`. `gte` represents that there are more than `total.value` results, wheras `eq` represents that the result count is exact.
+* `total.relation` can be either `eq` or `gte`. `gte` represents that there are more than `total.value` results, whereas `eq` represents that the result count is exact.
 * `hits[].event` is the source event. Specify keys included here using the `include` query parameter.
 * `hits[].highlights[]` specifies the relevant text for highlighting results of a search.
 * `hits[].highlights[].positions[]` specifies the positions of the highlights. `start` is inclusive, `end` is exclusive.
@@ -68,12 +92,11 @@ Before running, create an elasticsearch cluster (a single node with 512MB RAM wo
 
 * `app.js` will
   * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time
-  * serve search requests from elasticsearch for `/dtesters/search`
+  * serve search requests from elasticsearch for `/dtesters/search` and `/dtesters/total`
 
 * `import.js` will bulk ingest historical events from Trello into elasticsearch. Because of how the Trello API works, events are indexed in reverse order.
   * Define the `APP_TRELLO_BOARDS` environment variable to be the trello IDs of the boards which you want to ingest, joined with `,`s.
   * Define the `APP_TRELLO_START_DATE` environment variable to the ISO8601 date where you want to start importing. Importing will go back from this date to the beginning of Trello activity, or to `APP_TRELLO_END_DATE`, whichever is earliest.
   * (optional) Define the `APP_TRELLO_END_DATE` environment variable to ISO8601 date of when you want to end importing. This should be an earlier time than `APP_TRELLO_START_DATE`.
-  * (optional) Define the `APP_REQUEST_IPS` environment variable to the list of IPs that your machine has, joined with `,`s. This is used to increase ratelimits with the Trello API.
 
-Both of the scripts will need variables defined in a `.env` file. An example `.env` is in `.env.example`.
+Both of the scripts will need variables defined in a `.env` file. An example `.env` is in [`.env.example`](.env.example).
