@@ -6,10 +6,10 @@ const he = require('he')
 const got = require('got')
 const getRawBody = promisify(require('raw-body'))
 const { Client: ElasticClient } = require('@elastic/elasticsearch')
+const makeParseEvent = require('./make-parse-event')
 
 const trelloSecret = process.env.APP_TRELLO_SECRET
 const trelloWebhookUrl = Buffer.from(process.env.APP_TRELLO_WEBHOOK_URL)
-const trelloAutomatedIds = process.env.APP_TRELLO_AUTOMATED_IDS.split(',')
 
 const termFields = ['board', 'card', 'link', 'id', 'kind', 'user', 'admin_user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
@@ -62,6 +62,8 @@ const requestCard = async (id) => {
   const body = JSON.parse(res.body)
   return body
 }
+
+const parseEvent = makeParseEvent(requestCard)
 
 const elastic = new ElasticClient({
   node: process.env.APP_ELASTIC_SERVER,
@@ -125,90 +127,8 @@ http.createServer(async (req, res) => {
 
     sendResponse(200, 'Event received.')
 
-    const eventBody = {
-      time: Math.floor((new Date(body.action.date)).valueOf() / 1000),
-    }
-
-    let parsedCard
-
-    const automatedUser = trelloAutomatedIds.includes(body.action.idMemberCreator)
-
-    if (body.action.data.board !== undefined) {
-      eventBody.board = body.action.data.board.id
-    }
-    let card
-    if (body.action.data.card !== undefined) {
-      eventBody.card = body.action.data.card.id
-      eventBody.link = body.action.data.card.shortLink
-      card = await requestCard(body.action.data.card.id)
-      if (card instanceof Error) {
-        return
-      }
-      parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n(?<id>[0-9]+)?\n?$/is)
-      if (parsedCard !== null) {
-        eventBody.id = parsedCard.groups.id
-      }
-      if ((!automatedUser || parsedCard === null) && body.action.type === 'createCard') {
-        eventBody.content = card.desc
-      }
-    }
-
-    if (body.action.type === 'createCard') {
-      eventBody.kind = 'approve'
-      eventBody.title = card.name
-      if (eventBody.content === undefined) {
-        eventBody.user = parsedCard.groups.user
-        eventBody.steps = parsedCard.groups.steps
-        eventBody.expected = parsedCard.groups.expected
-        eventBody.actual = parsedCard.groups.actual
-        eventBody.client = parsedCard.groups.client
-        eventBody.system = parsedCard.groups.system
-      }
-      if (!automatedUser) {
-        eventBody.admin_user = body.action.idMemberCreator
-      }
-    } else if (body.action.type === 'addAttachmentToCard') {
-      if (automatedUser) {
-        eventBody.kind = 'attach'
-        eventBody.user = body.action.data.attachment.name
-      } else {
-        eventBody.kind = 'admin_attach'
-        eventBody.admin_user = body.action.idMemberCreator
-      }
-    } else if (body.action.type === 'commentCard') {
-      const parsedComment = body.action.data.text.match(/^(.*)\n\n(.*#[0-9]{4})$/s)
-      if (!automatedUser || parsedComment === null) {
-        eventBody.kind = 'admin_note'
-        eventBody.content = body.action.data.text
-        eventBody.admin_user = body.action.idMemberCreator
-      } else {
-        eventBody.user = parsedComment[2]
-        if (parsedComment[1].startsWith('Can reproduce.\n')) {
-          eventBody.kind = 'cr'
-          eventBody.content = parsedComment[1].replace('Can reproduce.\n', '')
-        } else if (body.action.data.text.startsWith('Can\'t reproduce.\n')) {
-          eventBody.kind = 'cnr'
-          eventBody.content = parsedComment[1].replace('Can\'t reproduce.\n', '')
-        } else {
-          eventBody.kind = 'note'
-          eventBody.content = parsedComment[1]
-        }
-      }
-    } else if (body.action.type === 'updateCard') {
-      if (body.action.data.old === undefined || body.action.data.card === undefined) {
-        return
-      }
-      if (!automatedUser) {
-        eventBody.admin_user = body.action.idMemberCreator
-      }
-      if (!body.action.data.old.closed && body.action.data.card.closed) {
-        eventBody.kind = 'archive'
-      } else if (body.action.data.old.closed && !body.action.data.card.closed) {
-        eventBody.kind = 'unarchive'
-      } else {
-        return
-      }
-    } else {
+    const eventBody = await parseEvent(body.action)
+    if (eventBody === undefined) {
       return
     }
 
