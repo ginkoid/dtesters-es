@@ -70,6 +70,10 @@
         "english_possessive_stemmer": {
           "type": "stemmer",
           "language": "possessive_english"
+        },
+        "english_phonetic": {
+          "type": "phonetic",
+          "encoder": "metaphone"
         }
       },
       "analyzer": {
@@ -80,7 +84,8 @@
             "asciifolding",
             "english_possessive_stemmer",
             "english_stop",
-            "english_stemmer"
+            "english_stemmer",
+            "english_phonetic"
           ]
         }
       }

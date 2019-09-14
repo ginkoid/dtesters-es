@@ -13,6 +13,16 @@ const trelloWebhookUrl = Buffer.from(process.env.APP_TRELLO_WEBHOOK_URL)
 
 const termFields = ['board', 'card', 'link', 'id', 'kind', 'user', 'admin_user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
+const matchBoosts = {
+  title: 6,
+  actual: 4,
+  expected: 4,
+  content: 3,
+  steps: 3,
+  client: 1,
+  system: 1,
+}
+const matchFieldBoosts = matchFields.map(field => `${field}^${matchBoosts[field]}`)
 const ingestIndexName = process.env.APP_ELASTIC_INGEST_INDEX
 const searchIndexName = process.env.APP_ELASTIC_SEARCH_INDEX
 const requestKinds = {
@@ -221,7 +231,7 @@ http.createServer(async (req, res) => {
       musts.push({
         simple_query_string: {
           query: params.get('query'),
-          fields: matchFields,
+          fields: matchFieldBoosts,
           default_operator: 'AND',
           lenient: true,
         },
@@ -230,9 +240,8 @@ http.createServer(async (req, res) => {
       musts.push({
         multi_match: {
           query: params.get('content'),
-          fields: matchFields,
+          fields: matchFieldBoosts,
           operator: 'AND',
-          fuzziness: 'AUTO',
         },
       })
     }

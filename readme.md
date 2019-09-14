@@ -88,7 +88,11 @@ Send a `GET` request to [`/dtesters/total`](https://gnk.gnk.io/dtesters/total) w
 
 ## Running your own
 
-Before running, create an elasticsearch cluster (a single node with 512MB RAM works fine), and create an index. The index's mappings and settings are in `index.json`.
+### Before running
+* Create an elasticsearch cluster. A single node assigned 512MB of memory should work, but you should be able to dedicate at least 1GB to elasticsearch.
+* Install the `analysis-phonetic` elasticsearch plugin into all of your nodes.
+* Create an index, using the settings and mappings from `es-index.json`
+* Create a `.env` file, containing all the environment variables defined in `.env.example`
 
 * `app.js` will
   * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time
@@ -98,5 +102,3 @@ Before running, create an elasticsearch cluster (a single node with 512MB RAM wo
   * Define the `APP_TRELLO_BOARDS` environment variable to be the trello IDs of the boards which you want to ingest, joined with `,`s.
   * Define the `APP_TRELLO_START_DATE` environment variable to the ISO8601 date where you want to start importing. Importing will go back from this date to the beginning of Trello activity, or to `APP_TRELLO_END_DATE`, whichever is earliest.
   * (optional) Define the `APP_TRELLO_END_DATE` environment variable to ISO8601 date of when you want to end importing. This should be an earlier time than `APP_TRELLO_START_DATE`.
-
-Both of the scripts will need variables defined in a `.env` file. An example `.env` is in [`.env.example`](.env.example).
