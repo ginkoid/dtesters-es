@@ -94,11 +94,12 @@ Send a `GET` request to [`/dtesters/total`](https://gnk.gnk.io/dtesters/total) w
 * Create an index, using the settings and mappings from `es-index.json`
 * Create a `.env` file, containing all the environment variables defined in `.env.example`
 
-* `app.js` will
-  * listen for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time
-  * serve search requests from elasticsearch for `/dtesters/search` and `/dtesters/total`
+### `app.js`
+* listens for Trello webhooks to `/dtesters/events`, and ingest events into elasticsearch one at a time.
+* serves search requests from elasticsearch for `/dtesters/search` and `/dtesters/total`.
 
-* `import.js` will bulk ingest historical events from Trello into elasticsearch. Because of how the Trello API works, events are indexed in reverse order.
-  * Define the `APP_TRELLO_BOARDS` environment variable to be the trello IDs of the boards which you want to ingest, joined with `,`s.
-  * Define the `APP_TRELLO_START_DATE` environment variable to the ISO8601 date where you want to start importing. Importing will go back from this date to the beginning of Trello activity, or to `APP_TRELLO_END_DATE`, whichever is earliest.
-  * (optional) Define the `APP_TRELLO_END_DATE` environment variable to ISO8601 date of when you want to end importing. This should be an earlier time than `APP_TRELLO_START_DATE`.
+### `import.js`
+* bulk ingests historical events from Trello into elasticsearch. Because of how the Trello API works, events are indexed in reverse order.
+* Define the `APP_TRELLO_BOARDS` environment variable to be the trello IDs of the boards which you want to ingest, joined with `,`s.
+* Define the `APP_TRELLO_START_DATE` environment variable to the ISO8601 date where you want to start importing. Importing will go back from this date to the beginning of Trello activity, or to `APP_TRELLO_END_DATE`, whichever is earliest.
+* (optional) Define the `APP_TRELLO_END_DATE` environment variable to ISO8601 date of when you want to end importing. This should be an earlier time than `APP_TRELLO_START_DATE`.
