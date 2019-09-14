@@ -59,21 +59,21 @@
   "settings": {
     "analysis": {
       "filter": {
-        "english_stop": {
+        "app_english_stop": {
           "type": "stop",
           "stopwords": "_english_"
         },
-        "english_stemmer": {
+        "app_english_stemmer": {
           "type": "stemmer",
           "language": "english"
         },
-        "english_possessive_stemmer": {
+        "app_english_possessive_stemmer": {
           "type": "stemmer",
           "language": "possessive_english"
         },
-        "english_phonetic": {
-          "type": "phonetic",
-          "encoder": "metaphone"
+        "app_english_synonyms": {
+          "type": "synonym",
+          "synonyms_path": "app_data/synonyms"
         }
       },
       "analyzer": {
@@ -82,10 +82,10 @@
           "filter": [
             "lowercase",
             "asciifolding",
-            "english_possessive_stemmer",
-            "english_stop",
-            "english_stemmer",
-            "english_phonetic"
+            "app_english_possessive_stemmer",
+            "app_english_stop",
+            "app_english_stemmer",
+            "app_english_synonyms"
           ]
         }
       }
