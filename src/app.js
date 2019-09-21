@@ -6,23 +6,16 @@ const he = require('he')
 const got = require('got')
 const getRawBody = promisify(require('raw-body'))
 const { Client: ElasticClient } = require('@elastic/elasticsearch')
+const nearley = require('nearley')
 const makeParseEvent = require('./make-parse-event')
+const fields = require('./fields')
+const nearleyQuery = require('./query')
+
+const nearleyGrammar = nearley.Grammar.fromCompiled(nearleyQuery)
 
 const trelloSecret = process.env.APP_TRELLO_SECRET
 const trelloWebhookUrl = Buffer.from(process.env.APP_TRELLO_WEBHOOK_URL)
 
-const termFields = ['board', 'card', 'link', 'id', 'kind', 'user', 'admin_user']
-const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
-const matchBoosts = {
-  title: 6,
-  actual: 4,
-  expected: 4,
-  content: 3,
-  steps: 3,
-  client: 1,
-  system: 1,
-}
-const matchFieldBoosts = matchFields.map(field => `${field}^${matchBoosts[field]}`)
 const ingestIndexName = process.env.APP_ELASTIC_INGEST_INDEX
 const searchIndexName = process.env.APP_ELASTIC_SEARCH_INDEX
 const requestKinds = {
@@ -186,7 +179,7 @@ http.createServer(async (req, res) => {
     const musts = []
     const filters = []
     params.forEach((v, k) => {
-      if (termFields.includes(k)) {
+      if (fields.termFields.includes(k)) {
         filters.push({
           term: {
             [k]: {
@@ -228,19 +221,23 @@ http.createServer(async (req, res) => {
       })
     }
     if (params.get('query') !== null) {
-      musts.push({
-        simple_query_string: {
-          query: params.get('query'),
-          fields: matchFieldBoosts,
-          default_operator: 'AND',
-          lenient: true,
-        },
-      })
+      const parser = new nearley.Parser(nearleyGrammar)
+      try {
+        parser.feed(params.get('query'))
+      } catch (e) {
+        sendResponse(400, 'The query is malformed.')
+        return
+      }
+      if (parser.results[0] === undefined) {
+        sendResponse(400, 'The query is malformed.')
+        return
+      }
+      musts.push(parser.results[0])
     } else if (params.get('content') !== null) {
       musts.push({
         multi_match: {
           query: params.get('content'),
-          fields: matchFieldBoosts,
+          fields: fields.matchFieldBoosts,
           operator: 'AND',
         },
       })
@@ -279,7 +276,7 @@ http.createServer(async (req, res) => {
       }
 
       if (highlightsParam === 'all' || highlightsParam === 'first') {
-        matchFields.forEach((field) => {
+        fields.matchFields.forEach((field) => {
           highlightsFields[field] = {}
         })
       }
