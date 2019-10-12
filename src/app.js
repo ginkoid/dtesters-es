@@ -164,12 +164,22 @@ http.createServer(async (req, res) => {
     let page
 
     if (requestKind === requestKinds.search) {
-      limit = parseInt(params.get('limit'))
+      const limitParam = params.get('limit')
+      if (limitParam === null) {
+        limit = 5
+      } else {
+        limit = parseInt(limitParam)
+      }
       if (Number.isNaN(limit) || limit < 1 || limit > 50) {
         sendResponse(400, 'The limit is invalid.')
         return
       }
-      page = parseInt(params.get('page'))
+      const pageParam = params.get('page')
+      if (pageParam === null) {
+        page = 0
+      } else {
+        page = parseInt(pageParam)
+      }
       if (Number.isNaN(page) || page < 0 || page > 100) {
         sendResponse(400, 'The page is invalid.')
         return
@@ -249,9 +259,10 @@ http.createServer(async (req, res) => {
     const highlightsFields = {}
 
     if (requestKind === requestKinds.search) {
-      if (params.get('sort') === 'relevance') {
+      const sortParam = params.get('sort')
+      if (sortParam === 'relevance') {
         sort = undefined
-      } else if (params.get('sort') === 'recency') {
+      } else if (sortParam === null || sortParam === 'recency') {
         sort = [{
           time: {
             order: 'desc',

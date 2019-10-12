@@ -75,16 +75,16 @@ Send a `GET` request to [`/dtesters/total`](https://gnk.gnk.io/dtesters/total) w
 
 ## Parameters for `search` and `total`
 
-* `limit` (required) (`search` only): The number of results on a page. Maximum of `50`. Minimum of `1`.
-* `page` (required) (`search` only): The page index for pagination. Starts at `0`. Maximum of `100`.
-* `sort` (required) (`search` only): Specifies the sort that the results will use. Either `recency` or `relevance`.
+* `limit` (default `5`) (`search` only): The number of results on a page. Maximum of `50`. Minimum of `1`.
+* `page` (default `0`) (`search` only): The page index for pagination. Starts at `0`. Maximum of `100`.
+* `sort` (default `recency`) (`search` only): Specifies the sort that the results will use. Either `recency` or `relevance`.
 * `include` (optional) (`search` only): The list of event attributes to include in the response. If this isn't provided, all attributes are included.
 * `highlights` (optional) (`search` only): Specifies how to include highlights in the response. Either `all`, `first`, or `none`. Defaults to `all`.
 * `before` (optional): Only include events before this time. Accepts seconds since Jan 1 1970.
 * `after` (optional): Only include events after this time. Accepts seconds since Jan 1 1970.
 * terms `board`, `card`, `link`, `id`, `kind`, `user`, `admin_user` (optional): Providing these attributes will filter based on the exact values provided. Partial matches are not possible
 * `content` (optional): Providing this parameter will search based on the `actual`, `client`, `content`, `expected`, `steps`, `system`, `title`. Supports partial matches.
-* `query` (optional): Providing this parameter will search based on all content attrbutes, using the full [elasticsearch simple query syntax](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-simple-query-string-query.html#simple-query-string-syntax)
+* `query` (optional): Providing this parameter will search based on all content attrbutes, using the query syntax defined in [`src/query.ne`](src/query.ne).
 
 ## Running your own
 
