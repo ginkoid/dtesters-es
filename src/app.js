@@ -9,7 +9,7 @@ const { Client: ElasticClient } = require('@elastic/elasticsearch')
 const nearley = require('nearley')
 const makeParseEvent = require('./make-parse-event')
 const fields = require('./fields')
-const nearleyQuery = require('./query')
+const nearleyQuery = require('./require-nearley')('query.ne')
 
 const nearleyGrammar = nearley.Grammar.fromCompiled(nearleyQuery)
 
