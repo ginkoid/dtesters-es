@@ -119,11 +119,13 @@ http.createServer(async (req, res) => {
       .createHmac('sha1', trelloSecret)
       .update(Buffer.concat([rawBody, trelloWebhookUrl]))
       .digest()
+    let trelloAuthCorrect = false
     try {
-      if (Buffer.compare(Buffer.from(req.headers['x-trello-webhook'], 'base64'), calculatedDigest) !== 0) {
-        throw 0
+      if (Buffer.compare(Buffer.from(req.headers['x-trello-webhook'], 'base64'), calculatedDigest) === 0) {
+        trelloAuthCorrect = true
       }
-    } catch (e) {
+    } catch (e) {}
+    if (!trelloAuthCorrect) {
       sendResponse(403, 'The request is not correctly authenticated.')
       return
     }
