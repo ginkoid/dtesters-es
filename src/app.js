@@ -251,6 +251,7 @@ http.createServer(async (req, res) => {
           query: params.get('content'),
           fields: fields.matchFieldBoosts,
           operator: 'AND',
+          type: 'cross_fields',
         },
       })
     }
