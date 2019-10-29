@@ -107,7 +107,7 @@ Send a `GET` request to [`/dtesters/total`](https://gnk.gnk.io/dtesters/total) w
 
 * Create an Elasticsearch cluster. A single node assigned 512MB of memory should work, but you should be able to dedicate at least 2GB to Elasticsearch.
 * Copy the [`app_data`](app_data) folder into your Elasticsearch config directory.
-* Create an index, using the settings and mappings from [`src/es-index.json`](src/es-index.json).
+* Create 2 indices, using the settings and mappings from [`src/indices`](src/indices).
 * Create a `.env` file, containing all the environment variables defined in [`.env.example`](.env.example).
 * Run `node src/app.js`. The server listens on `127.0.0.1:8001`.
 * Use a reverse proxy to forward requests to the node.js server.

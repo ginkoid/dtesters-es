@@ -1,6 +1,6 @@
 const trelloAutomatedIds = process.env.APP_TRELLO_AUTOMATED_IDS.split(',')
 
-module.exports = (requestCard) => async (action) => {
+module.exports = (requestCard, addUser) => async (action) => {
   const eventBody = {
     time: Math.floor((new Date(action.date)).valueOf() / 1000),
   }
@@ -20,7 +20,7 @@ module.exports = (requestCard) => async (action) => {
     if (card instanceof Error) {
       return
     }
-    parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?\n?\n(?<id>[0-9]+)?\n?$/is)
+    parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client_settings>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?(?:####Client version:\n ?(?<client_version>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
     if (parsedCard !== null) {
       eventBody.id = parsedCard.groups.id
     }
@@ -37,14 +37,15 @@ module.exports = (requestCard) => async (action) => {
       eventBody.steps = parsedCard.groups.steps
       eventBody.expected = parsedCard.groups.expected
       eventBody.actual = parsedCard.groups.actual
-      eventBody.client = parsedCard.groups.client
+      eventBody.client = parsedCard.groups.client_settings || parsedCard.groups.client_version
       eventBody.system = parsedCard.groups.system
     }
     if (!automatedUser) {
       eventBody.admin_user = action.idMemberCreator
     }
   } else if (action.type === 'addAttachmentToCard') {
-    if (automatedUser) {
+    const nameIsUser = /^.{2,32}#[0-9]{4}$/.test(action.data.attachment.name)
+    if (automatedUser && nameIsUser) {
       eventBody.kind = 'attach'
       eventBody.user = action.data.attachment.name
     } else {
@@ -86,6 +87,10 @@ module.exports = (requestCard) => async (action) => {
     }
   } else {
     return
+  }
+
+  if (eventBody.user !== undefined) {
+    addUser(eventBody.user)
   }
 
   return eventBody

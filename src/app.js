@@ -16,11 +16,15 @@ const nearleyGrammar = nearley.Grammar.fromCompiled(nearleyQuery)
 const trelloSecret = process.env.APP_TRELLO_SECRET
 const trelloWebhookUrl = Buffer.from(process.env.APP_TRELLO_WEBHOOK_URL)
 
-const ingestIndexName = process.env.APP_ELASTIC_INGEST_INDEX
-const searchIndexName = process.env.APP_ELASTIC_SEARCH_INDEX
+const ingestEventsIndexName = process.env.APP_ELASTIC_EVENTS_INGEST_INDEX
+const searchEventsIndexName = process.env.APP_ELASTIC_EVENTS_SEARCH_INDEX
+const ingestUsersIndexName = process.env.APP_ELASTIC_USERS_INGEST_INDEX
+const searchUsersIndexName = process.env.APP_ELASTIC_USERS_SEARCH_INDEX
+
 const requestKinds = {
   search: 0,
   total: 1,
+  users: 2,
 }
 
 const findEms = (text) => {
@@ -51,6 +55,15 @@ const findEms = (text) => {
 
 const wait = (time) => new Promise((resolve) => setTimeout(() => resolve(), time))
 
+const elastic = new ElasticClient({
+  node: process.env.APP_ELASTIC_SERVER,
+  requestTimeout: 5000,
+  auth: {
+    username: process.env.APP_ELASTIC_USER,
+    password: process.env.APP_ELASTIC_PASSWORD,
+  },
+})
+
 const requestCard = async (id) => {
   let res
   try {
@@ -66,16 +79,17 @@ const requestCard = async (id) => {
   return body
 }
 
-const parseEvent = makeParseEvent(requestCard)
+const addUser = async (user) => {
+  await elastic.index({
+    index: ingestUsersIndexName,
+    id: crypto.createHash('sha256').update(user).digest('hex'),
+    body: {
+      user,
+    },
+  })
+}
 
-const elastic = new ElasticClient({
-  node: process.env.APP_ELASTIC_SERVER,
-  requestTimeout: 5000,
-  auth: {
-    username: process.env.APP_ELASTIC_USER,
-    password: process.env.APP_ELASTIC_PASSWORD,
-  },
-})
+const parseEvent = makeParseEvent(requestCard, addUser)
 
 http.createServer(async (req, res) => {
   const sendResponse = (status, message) => {
@@ -138,16 +152,18 @@ http.createServer(async (req, res) => {
     }
 
     await elastic.index({
-      index: ingestIndexName,
+      index: ingestEventsIndexName,
       id: body.action.id,
       body: eventBody,
     })
-  } else if (splitUrl[0] === '/dtesters/search' || splitUrl[0] === '/dtesters/total') {
+  } else if (['/dtesters/search', '/dtesters/total', '/dtesters/users'].includes(splitUrl[0])) {
     let requestKind
     if (splitUrl[0] === '/dtesters/search') {
       requestKind = requestKinds.search
-    } else {
+    } else if (splitUrl[0] === '/dtesters/total') {
       requestKind = requestKinds.total
+    } else {
+      requestKind = requestKinds.users
     }
 
     if (req.method !== 'GET') {
@@ -165,7 +181,7 @@ http.createServer(async (req, res) => {
     let limit
     let page
 
-    if (requestKind === requestKinds.search) {
+    if (requestKind !== requestKinds.total) {
       const limitParam = params.get('limit')
       if (limitParam === null) {
         limit = 5
@@ -190,110 +206,130 @@ http.createServer(async (req, res) => {
 
     const musts = []
     const filters = []
-    params.forEach((v, k) => {
-      if (fields.termFields.includes(k)) {
-        filters.push({
-          term: {
-            [k]: {
-              value: v,
-            },
-          },
-        })
-      }
-    })
-    const beforeParam = params.get('before')
-    let before
-    if (beforeParam !== null) {
-      before = parseInt(beforeParam)
-      if (Number.isNaN(before) || before < 0) {
-        sendResponse(400, 'The before is invalid.')
-        return
-      }
-      filters.push({
-        range: {
-          time: {
-            lte: before,
-          },
-        },
-      })
-    }
-    const afterParam = params.get('after')
-    if (afterParam !== null) {
-      const after = parseInt(afterParam)
-      if (Number.isNaN(after) || after < 0 || (before !== undefined && after > before)) {
-        sendResponse(400, 'The after is invalid.')
-        return
-      }
-      filters.push({
-        range: {
-          time: {
-            gte: after,
-          },
-        },
-      })
-    }
-    if (params.get('query') !== null) {
-      const parser = new nearley.Parser(nearleyGrammar)
-      try {
-        parser.feed(params.get('query'))
-      } catch (e) {
-        sendResponse(400, 'The query is malformed.')
-        return
-      }
-      if (parser.results[0] === undefined) {
-        sendResponse(400, 'The query is malformed.')
-        return
-      }
-      musts.push(parser.results[0])
-    } else if (params.get('content') !== null) {
-      musts.push({
-        multi_match: {
-          query: params.get('content'),
-          fields: fields.matchFieldBoosts,
-          operator: 'AND',
-          type: 'cross_fields',
-        },
-      })
-    }
-
     let sort
     let includeKeys
     let highlightsParam
     const highlightsFields = {}
-
-    if (requestKind === requestKinds.search) {
-      const sortParam = params.get('sort')
-      if (sortParam === 'relevance') {
-        sort = undefined
-      } else if (sortParam === null || sortParam === 'recency') {
-        sort = [{
-          time: {
-            order: 'desc',
-          },
-        }]
-      } else {
-        sendResponse(400, 'The sort is invalid.')
-        return
-      }
+    
+    if (requestKind !== requestKinds.users) {
       const includeParam = params.get('include')
       if (includeParam !== null) {
         includeKeys = includeParam.split(',')
       }
 
-      highlightsParam = params.get('highlights')
-      if (highlightsParam === null) {
-        highlightsParam = 'all'
-      }
-      if (!['all', 'first', 'none'].includes(highlightsParam)) {
-        sendResponse(400, 'The highlights option is invalid.')
-        return
-      }
+      params.forEach((v, k) => {
+        if (fields.termFields.includes(k)) {
+          filters.push({
+            term: {
+              [k]: {
+                value: v,
+              },
+            },
+          })
+        }
+      })
 
-      if (highlightsParam === 'all' || highlightsParam === 'first') {
-        fields.matchFields.forEach((field) => {
-          highlightsFields[field] = {}
+      const beforeParam = params.get('before')
+      let before
+      if (beforeParam !== null) {
+        before = parseInt(beforeParam)
+        if (Number.isNaN(before) || before < 0) {
+          sendResponse(400, 'The before is invalid.')
+          return
+        }
+        filters.push({
+          range: {
+            time: {
+              lte: before,
+            },
+          },
         })
       }
+      const afterParam = params.get('after')
+      if (afterParam !== null) {
+        const after = parseInt(afterParam)
+        if (Number.isNaN(after) || after < 0 || (before !== undefined && after > before)) {
+          sendResponse(400, 'The after is invalid.')
+          return
+        }
+        filters.push({
+          range: {
+            time: {
+              gte: after,
+            },
+          },
+        })
+      }
+
+      if (params.get('query') !== null) {
+        const parser = new nearley.Parser(nearleyGrammar)
+        try {
+          parser.feed(params.get('query'))
+        } catch (e) {
+          sendResponse(400, 'The query is malformed.')
+          return
+        }
+        if (parser.results[0] === undefined) {
+          sendResponse(400, 'The query is malformed.')
+          return
+        }
+        musts.push(parser.results[0])
+      } else if (params.get('content') !== null) {
+        musts.push({
+          multi_match: {
+            query: params.get('content'),
+            fields: fields.matchFieldBoosts,
+            operator: 'AND',
+            type: 'cross_fields',
+          },
+        })
+      }
+  
+      if (requestKind === requestKinds.search) {
+        const sortParam = params.get('sort')
+        if (sortParam === 'relevance') {
+          sort = undefined
+        } else if (sortParam === null || sortParam === 'recency') {
+          sort = [{
+            time: {
+              order: 'desc',
+            },
+          }]
+        } else {
+          sendResponse(400, 'The sort is invalid.')
+          return
+        }
+  
+        highlightsParam = params.get('highlights')
+        if (highlightsParam === null) {
+          highlightsParam = 'all'
+        }
+        if (!['all', 'first', 'none'].includes(highlightsParam)) {
+          sendResponse(400, 'The highlights option is invalid.')
+          return
+        }
+  
+        if (highlightsParam === 'all' || highlightsParam === 'first') {
+          fields.matchFields.forEach((field) => {
+            highlightsFields[field] = {}
+          })
+        }
+      }
+    }
+
+    if (requestKind === requestKinds.users) {
+      const prefix = params.get('prefix')
+      if (prefix === null || prefix.length < 1) {
+        sendResponse(400, 'The prefix is invalid.')
+        return
+      }
+      filters.push({
+        prefix: {
+          user: {
+            value: prefix,
+          },
+        },
+      })
     }
 
     const query = {
@@ -310,25 +346,28 @@ http.createServer(async (req, res) => {
           body: {
             query,
           },
-          index: searchIndexName,
+          index: searchEventsIndexName,
         })
       } else {
-        result = await elastic.search({
+        const searchParams = {
           body: {
             query,
             sort,
-            highlight: {
-              boundary_scanner_locale: 'en-US',
-              encoder: 'html',
-              order: 'score',
-              fields: highlightsFields,
-            },
           },
-          index: searchIndexName,
+          index: requestKind === requestKinds.users ? searchUsersIndexName : searchEventsIndexName,
           timeout: '5s',
           size: limit,
           from: page * limit,
-        })
+        }
+        if (requestKind !== requestKinds.users) {
+          searchParams.body.highlight = {
+            boundary_scanner_locale: 'en-US',
+            encoder: 'html',
+            order: 'score',
+            fields: highlightsFields,
+          }
+        }
+        result = await elastic.search(searchParams)
       }
     } catch (e) {
       console.error(e, e.meta)
@@ -343,43 +382,47 @@ http.createServer(async (req, res) => {
     res.writeHead(200, {
       'content-type': 'application/json',
     })
-    if (requestKind === requestKinds.search) {
+    if (requestKind === requestKinds.search || requestKind === requestKinds.users) {
       res.end(JSON.stringify({
         total: result.body.hits.total,
         hits: result.body.hits.hits.map(hit => {
-          const highlight = hit.highlight || {}
-          const highlightResult = []
-          let hightlightEntries = Object.entries(highlight)
-          if (highlightsParam === 'first' && hightlightEntries.length > 0) {
-            hightlightEntries = [hightlightEntries[0]]
-          }
-          hightlightEntries.forEach(([key, highlightsValue]) => {
-            let highlights = highlightsValue
-            if (highlightsParam === 'first' && highlights.length > 0) {
-              highlights = [highlights[0]]
+          let highlightResult
+          let event
+          if (requestKind === requestKinds.search) {
+            highlightResult = []
+            const highlight = hit.highlight || {}
+            let hightlightEntries = Object.entries(highlight)
+            if (highlightsParam === 'first' && hightlightEntries.length > 0) {
+              hightlightEntries = [hightlightEntries[0]]
             }
-            highlights.forEach((text) => {
-              const positions = findEms(he.decode(text))
-              highlightResult.push({
-                key,
-                text: he.decode(text.replace(/(<em>|<\/em>)/g, '')),
-                positions,
+            hightlightEntries.forEach(([key, highlightsValue]) => {
+              let highlights = highlightsValue
+              if (highlightsParam === 'first' && highlights.length > 0) {
+                highlights = [highlights[0]]
+              }
+              highlights.forEach((text) => {
+                const positions = findEms(he.decode(text))
+                highlightResult.push({
+                  key,
+                  text: he.decode(text.replace(/(<em>|<\/em>)/g, '')),
+                  positions,
+                })
               })
             })
-          })
-          let event
-          if (includeKeys === undefined) {
-            event = hit._source
-          } else {
-            event = {}
-            Object.keys(hit._source).forEach((key) => {
-              if (includeKeys.includes(key)) {
-                event[key] = hit._source[key]
-              }
-            })
+            if (includeKeys === undefined) {
+              event = hit._source
+            } else {
+              event = {}
+              Object.keys(hit._source).forEach((key) => {
+                if (includeKeys.includes(key)) {
+                  event[key] = hit._source[key]
+                }
+              })
+            }
           }
           return {
             event,
+            user: requestKind === requestKinds.users ? hit._source.user : undefined,
             highlights: highlightResult,
           }
         })

@@ -1,0 +1,23 @@
+{
+  "mappings": {
+    "properties": {
+      "user": {
+        "type": "keyword",
+        "normalizer": "app_user"
+      }
+    }
+  },
+  "settings": {
+    "analysis": {
+      "normalizer": {
+        "app_user": {
+          "type": "custom",
+          "filter": [
+            "lowercase",
+            "asciifolding"
+          ]
+        }
+      }
+    }
+  }
+}

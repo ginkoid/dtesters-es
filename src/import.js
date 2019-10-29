@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 require('dotenv').config()
 const got = require('got')
 const pMap = require('p-map')
@@ -8,13 +9,22 @@ const boards = process.env.APP_TRELLO_BOARDS.split(',')
 const startDate = process.env.APP_TRELLO_START_DATE
 const endDate = process.env.APP_TRELLO_END_DATE
 
-const indexName = process.env.APP_ELASTIC_INGEST_INDEX
+const eventsIndexName = process.env.APP_ELASTIC_EVENTS_INGEST_INDEX
+const usersIndexName = process.env.APP_ELASTIC_USERS_INGEST_INDEX
 
 if (startDate === undefined) {
   throw new Error('APP_TRELLO_START_DATE is not defined')
 }
 
 const wait = (time) => new Promise((resolve) => setTimeout(() => resolve(), time))
+
+const elastic = new ElasticClient({
+  node: process.env.APP_ELASTIC_SERVER,
+  auth: {
+    username: process.env.APP_ELASTIC_USER,
+    password: process.env.APP_ELASTIC_PASSWORD,
+  },
+})
 
 const cardCache = new Map()
 
@@ -38,15 +48,17 @@ const requestCard = async (id) => {
   return body
 }
 
-const parseEvent = makeParseEvent(requestCard)
+const addUser = async (user) => {
+  await elastic.index({
+    index: usersIndexName,
+    id: crypto.createHash('sha256').update(user).digest('hex'),
+    body: {
+      user,
+    },
+  })
+}
 
-const elastic = new ElasticClient({
-  node: process.env.APP_ELASTIC_SERVER,
-  auth: {
-    username: process.env.APP_ELASTIC_USER,
-    password: process.env.APP_ELASTIC_PASSWORD,
-  },
-})
+const parseEvent = makeParseEvent(requestCard, addUser)
 
 const importEvent = async (action) => {
   if (endDate !== undefined && (new Date(action.date)) < (new Date(endDate))) {
@@ -59,7 +71,7 @@ const importEvent = async (action) => {
   }
 
   await elastic.index({
-    index: indexName,
+    index: eventsIndexName,
     id: action.id,
     body: eventBody,
   })
@@ -82,7 +94,7 @@ const importChunk = async (before, board) => {
   await tryRequest()
   await pMap(actions, async (action) => {
     await importEvent(action)
-  }, { concurrency: 100 })
+  }, { concurrency: 50 })
   if (endDate !== undefined && (new Date(actions[actions.length - 1].date)) < (new Date(endDate))) {
     return
   }
