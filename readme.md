@@ -27,6 +27,8 @@ An API for ingesting and searching Discord Testers data.
   * Filter the response to only include a highlighted snippet for the most relevant section.
 * [`/dtesters/search?sort=relevance&kind=approve&query=modal and not button`](https://gnk.gnk.io/dtesters/search?sort=relevance&kind=approve&query=modal%20and%20not%20button)
   * Find the 5 most relevant bugs regarding modals but not buttons.
+* [`/dtesters/users?prefix=user`](https://gnk.gnk.io/dtesters/users?prefix=user)
+  * Find all users with a username prefixed with the string `user`.
 
 ## Using the `search` API
 
@@ -86,6 +88,31 @@ Send a `GET` request to [`/dtesters/total`](https://gnk.gnk.io/dtesters/total) w
 * `content` (optional): Providing this parameter will search based on the `actual`, `client`, `content`, `expected`, `steps`, `system`, `title` attributes. Partial matches are possible.
 * `query` (optional): Providing this parameter will search based on all content attrbutes, using the query syntax defined in [`src/query.ne`](src/query.ne).
 
+## Using the `users` API
+
+Send a `GET` request to [`/dtesters/users`](https://gnk.gnk.io/dtesters/users) with these parameters:
+
+* `prefix` (required): The prefix of the user to search for, formatted as DiscordTag#0000.
+* `limit` (default `5`): The number of results on a page. Maximum of `50`. Minimum of `1`.
+* `page` (default `0`) The page index for pagination. Starts at `0`. Maximum of `100`.
+
+The response will look like this:
+
+```json
+{
+  "total": {
+    "value": 100,
+    "relation": "eq"
+  },
+  "hits": [{
+    "user": "DiscordTag#0000"
+  }]
+}
+```
+
+* `total.relation` can be either `eq` or `gte`. `gte` represents that there are more than `total.value` results, whereas `eq` represents that the result count is exact.
+* `hits[].user` is the user, formatted as DiscordTag#0000.
+
 ## Event attributes
 
 * `board`: The Trello board ID.
@@ -111,11 +138,12 @@ Send a `GET` request to [`/dtesters/total`](https://gnk.gnk.io/dtesters/total) w
 * Create a `.env` file, containing all the environment variables defined in [`.env.example`](.env.example).
 * Run `node src/app.js`. The server listens on `127.0.0.1:8001`.
 * Use a reverse proxy to forward requests to the node.js server.
-* [Configure Trello to send webhooks](https://developers.trello.com/page/webhooks) for the boards defined in `APP_TRELLO_BOARDS` to the URL in `APP_TRELLO_WEBHOOK_URL`.
+* [Configure Trello to send webhooks](https://developers.trello.com/page/webhooks) to `/dtesters/events` for the boards defined in `APP_TRELLO_BOARDS`.
 
 ### `src/app.js`
 * listens for Trello webhooks to `/dtesters/events`, and ingests events into Elasticsearch one at a time.
-* serves search requests from Elasticsearch for `/dtesters/search` and `/dtesters/total`.
+* serves event search requests from Elasticsearch for `/dtesters/search` and `/dtesters/total`.
+* serves user search requests from Elasticsearch for `/dtesters/users`.
 
 ### `src/import.js`
 * backfills historical events from Trello into Elasticsearch. Because of how the Trello API works, events are indexed in reverse chronological order.
