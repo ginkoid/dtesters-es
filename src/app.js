@@ -55,6 +55,14 @@ const findEms = (text) => {
 
 const wait = (time) => new Promise((resolve) => setTimeout(() => resolve(), time))
 
+const safeParseInt = (input) => {
+  let out = parseInt(input)
+  if (out > Number.MAX_SAFE_INTEGER || out < Number.MIN_SAFE_INTEGER) {
+    out = NaN
+  }
+  return out
+}
+
 const elastic = new ElasticClient({
   node: process.env.APP_ELASTIC_SERVER,
   requestTimeout: 5000,
@@ -186,7 +194,7 @@ http.createServer(async (req, res) => {
       if (limitParam === null) {
         limit = 5
       } else {
-        limit = parseInt(limitParam)
+        limit = safeParseInt(limitParam)
       }
       if (Number.isNaN(limit) || limit < 1 || limit > 50) {
         sendResponse(400, 'The limit is invalid.')
@@ -196,7 +204,7 @@ http.createServer(async (req, res) => {
       if (pageParam === null) {
         page = 0
       } else {
-        page = parseInt(pageParam)
+        page = safeParseInt(pageParam)
       }
       if (Number.isNaN(page) || page < 0 || page > 100) {
         sendResponse(400, 'The page is invalid.')
@@ -232,7 +240,7 @@ http.createServer(async (req, res) => {
       const beforeParam = params.get('before')
       let before
       if (beforeParam !== null) {
-        before = parseInt(beforeParam)
+        before = safeParseInt(beforeParam)
         if (Number.isNaN(before) || before < 0) {
           sendResponse(400, 'The before is invalid.')
           return
@@ -247,7 +255,7 @@ http.createServer(async (req, res) => {
       }
       const afterParam = params.get('after')
       if (afterParam !== null) {
-        const after = parseInt(afterParam)
+        const after = safeParseInt(afterParam)
         if (Number.isNaN(after) || after < 0 || (before !== undefined && after > before)) {
           sendResponse(400, 'The after is invalid.')
           return
