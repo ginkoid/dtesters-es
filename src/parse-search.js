@@ -1,10 +1,10 @@
 const ResponseError = require('./response-error')
 const fields = require('./fields')
 
-const parseEventSearchQuery = (params) => {
+const parseSearch = (params) => {
   let sort
   let highlightsParam
-  let highlightsFields
+  let highlightsFields = {}
 
   const sortParam = params.get('sort')
   if (sortParam === 'relevance') {
@@ -40,4 +40,4 @@ const parseEventSearchQuery = (params) => {
   }
 }
 
-module.exports = parseEventSearchQuery
+module.exports = parseSearch

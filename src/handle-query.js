@@ -1,7 +1,7 @@
 const elastic = require('./elastic')
 const parsePagination = require('./parse-pagination')
 const parseEventSearch = require('./parse-event-search')
-const parseEventSearchQuery = require('./parse-event-search-query')
+const parseSearch = require('./parse-search')
 const formatHit = require('./format-hit')
 const requestKinds = require('./request-kinds')
 const ResponseError = require('./response-error')
@@ -33,7 +33,7 @@ const handleQuery = async ({
   }
 
   if (requestKind === requestKinds.search) {
-    ({ sort, highlightsParam, highlightsFields } = parseEventSearchQuery(params))
+    ({ sort, highlightsParam, highlightsFields } = parseSearch(params))
   }
 
   if (requestKind === requestKinds.users) {

@@ -2,7 +2,7 @@ const crypto = require('crypto')
 const got = require('got')
 const elastic = require('./elastic')
 const makeParseEvent = require('./make-parse-event')
-const getTrelloEvent = require('./get-trello-event')
+const validateTrelloHook = require('./validate-trello-hook')
 
 const wait = (time) => new Promise((resolve) => setTimeout(() => resolve(), time))
 
@@ -40,7 +40,7 @@ const handleIngest = async ({
   req,
   sendResponse
 }) => {
-  const body = await getTrelloEvent(req)
+  const body = await validateTrelloHook(req)
 
   sendResponse(200, 'Event received.')
 

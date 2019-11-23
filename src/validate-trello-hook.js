@@ -6,7 +6,7 @@ const ResponseError = require('./response-error')
 const trelloSecret = process.env.APP_TRELLO_SECRET
 const trelloWebhookUrl = Buffer.from(process.env.APP_TRELLO_WEBHOOK_URL)
 
-const getTrelloEvent = async (req) => {
+const validateTrelloHook = async (req) => {
   let rawBody
   let body
   try {
@@ -35,4 +35,4 @@ const getTrelloEvent = async (req) => {
   return body
 }
 
-module.exports = getTrelloEvent
+module.exports = validateTrelloHook

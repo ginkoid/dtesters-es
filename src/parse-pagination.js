@@ -1,4 +1,4 @@
-import ResponseError from './response-error'
+const ResponseError = require('./response-error')
 
 const safeParseInt = (input) => {
   let out = parseInt(input)

@@ -66,6 +66,7 @@ http.createServer(async (req, res) => {
     if (e instanceof ResponseError) {
       sendResponse(e.resStatus, e.resMessage)
     } else {
+      console.error(e)
       sendResponse(500, 'Internal error.')
     }
   }
