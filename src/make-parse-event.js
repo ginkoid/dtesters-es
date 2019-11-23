@@ -2,7 +2,7 @@ const trelloAutomatedIds = process.env.APP_TRELLO_AUTOMATED_IDS.split(',')
 
 module.exports = (requestCard, addUser) => async (action) => {
   const eventBody = {
-    time: Math.floor((new Date(action.date)).valueOf() / 1000),
+    time: Math.floor((new Date(action.date)).valueOf() / 1000)
   }
 
   let parsedCard

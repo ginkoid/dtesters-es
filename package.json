@@ -12,5 +12,8 @@
     "nearley": "^2.19.0",
     "p-map": "^3.0.0",
     "raw-body": "^2.4.1"
+  },
+  "devDependencies": {
+    "standard": "^14.3.1"
   }
 }

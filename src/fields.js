@@ -7,11 +7,11 @@ const matchBoosts = {
   content: 3,
   steps: 3,
   client: 1,
-  system: 1,
+  system: 1
 }
 const matchFieldBoosts = matchFields.map(field => `${field}^${matchBoosts[field]}`)
 module.exports = {
   termFields,
   matchFields,
-  matchFieldBoosts,
+  matchFieldBoosts
 }

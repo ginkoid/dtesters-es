@@ -22,8 +22,8 @@ const elastic = new ElasticClient({
   node: process.env.APP_ELASTIC_SERVER,
   auth: {
     username: process.env.APP_ELASTIC_USER,
-    password: process.env.APP_ELASTIC_PASSWORD,
-  },
+    password: process.env.APP_ELASTIC_PASSWORD
+  }
 })
 
 const cardCache = new Map()
@@ -53,8 +53,8 @@ const addUser = async (user) => {
     index: usersIndexName,
     id: crypto.createHash('sha256').update(user).digest('hex'),
     body: {
-      user,
-    },
+      user
+    }
   })
 }
 
@@ -73,7 +73,7 @@ const importEvent = async (action) => {
   await elastic.index({
     index: eventsIndexName,
     id: action.id,
-    body: eventBody,
+    body: eventBody
   })
 }
 
@@ -83,7 +83,7 @@ const importChunk = async (before, board) => {
   const tryRequest = async () => {
     try {
       actions = JSON.parse((await got(
-        `https://api.trello.com/1/boards/${board}/actions/?limit=1000&filter=createCard,commentCard,updateCard,addAttachmentToCard&before=${before}`,
+        `https://api.trello.com/1/boards/${board}/actions/?limit=1000&filter=createCard,commentCard,updateCard,addAttachmentToCard&before=${before}`
       )).body)
     } catch (e) {
       await wait(5000)
