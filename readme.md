@@ -136,7 +136,7 @@ The response will look like this:
 * Copy the [`app_data`](app_data) folder into your Elasticsearch config directory.
 * Create 2 indices, using the settings and mappings from [`src/indices`](src/indices).
 * Create a `.env` file, containing all the environment variables defined in [`.env.example`](.env.example).
-* Run `node src/app.js`. The server listens on `127.0.0.1:8001`.
+* Run `node src/app.js`. The server listens on `127.0.0.1:8001`. The server requires Node.js >12.2.0.
 * Use a reverse proxy to forward requests to the node.js server.
 * [Configure Trello to send webhooks](https://developers.trello.com/page/webhooks) to `/dtesters/events` for the boards defined in `APP_TRELLO_BOARDS`.
 

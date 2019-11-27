@@ -1,6 +1,6 @@
 const path = require('path')
 const fs = require('fs')
-const { createRequireFromPath } = require('module') // eslint-disable-line node/no-deprecated-api
+const { createRequire } = require('module')
 const vm = require('vm')
 const nearley = require('nearley')
 const compile = require('nearley/lib/compile')
@@ -17,7 +17,7 @@ const requireNearley = (filePathInput) => {
   const grammarJs = generate(grammarInfoObject, 'grammar')
   const sandbox = {
     module: { exports: {} },
-    require: createRequireFromPath(filePath)
+    require: createRequire(filePath)
   }
   vm.createContext(sandbox)
   vm.runInContext(grammarJs, sandbox)

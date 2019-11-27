@@ -4,7 +4,7 @@ const fields = require('./fields')
 const parseSearch = (params) => {
   let sort
   let highlightsParam
-  let highlightsFields = {}
+  const highlightsFields = {}
 
   const sortParam = params.get('sort')
   if (sortParam === 'relevance') {
