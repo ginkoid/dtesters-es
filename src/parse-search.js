@@ -28,7 +28,7 @@ const parseSearch = (params) => {
   }
 
   if (highlightsParam === 'all' || highlightsParam === 'first') {
-    fields.matchFields.forEach((field) => {
+    fields.highlightFields.forEach((field) => {
       highlightsFields[field] = {}
     })
   }

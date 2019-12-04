@@ -1,5 +1,6 @@
 const termFields = ['board', 'card', 'link', 'id', 'kind', 'user', 'admin_user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
+const highlightFields = ['actual', 'client', 'content', 'expected', 'steps', 'system']
 const matchBoosts = {
   title: 6,
   actual: 4,
@@ -13,5 +14,6 @@ const matchFieldBoosts = matchFields.map(field => `${field}^${matchBoosts[field]
 module.exports = {
   termFields,
   matchFields,
+  highlightFields,
   matchFieldBoosts
 }

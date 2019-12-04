@@ -5,6 +5,8 @@ const requestKinds = require('./request-kinds')
 const handleQuery = require('./handle-query')
 const handleIngest = require('./handle-ingest')
 
+const port = parseInt(process.env.APP_PORT)
+
 http.createServer(async (req, res) => {
   const sendResponse = (status, message) => {
     res.writeHead(status, {
@@ -70,6 +72,6 @@ http.createServer(async (req, res) => {
       sendResponse(500, 'Internal error.')
     }
   }
-}).listen(8001, '127.0.0.1', () => {
-  console.log('listening on 127.0.0.1:8001')
+}).listen(port, '127.0.0.1', () => {
+  console.log(`listening on 127.0.0.1:${port}`)
 })
