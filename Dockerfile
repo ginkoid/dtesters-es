@@ -7,8 +7,8 @@ COPY src /app/src
 ENV NODE_ENV production
 RUN yarn
 
-ENV APP_PORT 80
-EXPOSE 80
+ENV APP_PORT 8000
+EXPOSE 8000
 
 USER node
 
