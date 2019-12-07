@@ -8,8 +8,7 @@ ENV NODE_ENV production
 RUN yarn
 
 ENV APP_PORT 8000
+ENV APP_HOST 0.0.0.0
 EXPOSE 8000
-
-USER node
 
 CMD ["node", "/app/src/app.js"]

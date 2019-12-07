@@ -6,6 +6,7 @@ const handleQuery = require('./handle-query')
 const handleIngest = require('./handle-ingest')
 
 const port = parseInt(process.env.APP_PORT)
+const host = process.env.APP_HOST
 
 http.createServer(async (req, res) => {
   const sendResponse = (status, message) => {
@@ -72,6 +73,6 @@ http.createServer(async (req, res) => {
       sendResponse(500, 'Internal error.')
     }
   }
-}).listen(port, '127.0.0.1', () => {
-  console.log(`listening on 127.0.0.1:${port}`)
+}).listen(port, host, () => {
+  console.log(`listening on ${host}:${port}`)
 })
