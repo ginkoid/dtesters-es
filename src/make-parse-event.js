@@ -12,6 +12,9 @@ module.exports = (requestCard, addUser) => async (action) => {
   if (action.data.board !== undefined) {
     eventBody.board = action.data.board.id
   }
+  if (action.data.list !== undefined) {
+    eventBody.list = action.data.list.id
+  }
   let card
   if (action.data.card !== undefined) {
     eventBody.card = action.data.card.id
@@ -20,6 +23,7 @@ module.exports = (requestCard, addUser) => async (action) => {
     if (card instanceof Error) {
       return
     }
+    eventBody.label = card.idLabels
     parsedCard = card.desc.match(/^(?:Reported by (?<user>.*?#[0-9]{4}))?\n?\n?(?:####Steps to reproduce: ?\n?(?<steps>.*?))?\n?\n?(?:####Expected result:\n ?(?<expected>.*?))?\n?\n?(?:####Actual result:\n ?(?<actual>.*?))?\n?\n?(?:####Client settings:\n ?(?<client_settings>.*?))?\n?\n?(?:####System settings:\n ?(?<system>.*?))?(?:####Client version:\n ?(?<client_version>.*?))?\n?\n?(?<id>[0-9]+)?\n?$/is)
     if (parsedCard !== null) {
       eventBody.id = parsedCard.groups.id

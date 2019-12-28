@@ -19,6 +19,14 @@
         "type": "keyword",
         "normalizer": "app_keyword"
       },
+      "list": {
+        "type": "keyword",
+        "normalizer": "app_keyword"
+      },
+      "label": {
+        "type": "keyword",
+        "normalizer": "app_keyword"
+      },
       "card": {
         "type": "keyword",
         "normalizer": "app_keyword"
