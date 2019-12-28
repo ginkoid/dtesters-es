@@ -3,56 +3,133 @@
     "properties": {
       "actual": {
         "type": "text",
-        "analyzer": "app_english"
+        "analyzer": "app_english",
+        "fields": {
+          "phrase": {
+            "type": "text",
+            "analyzer": "app_phrase"
+          },
+          "incremental": {
+            "type": "search_as_you_type",
+            "analyzer": "app_phrase"
+          }
+        }
       },
       "board": {
-        "type": "keyword"
+        "type": "keyword",
+        "normalizer": "app_keyword"
       },
       "card": {
-        "type": "keyword"
+        "type": "keyword",
+        "normalizer": "app_keyword"
       },
       "link": {
-        "type": "keyword"
+        "type": "keyword",
+        "normalizer": "app_keyword"
       },
       "client": {
         "type": "text",
-        "analyzer": "app_english"
+        "analyzer": "app_english",
+        "fields": {
+          "phrase": {
+            "type": "text",
+            "analyzer": "app_phrase"
+          },
+          "incremental": {
+            "type": "search_as_you_type",
+            "analyzer": "app_phrase"
+          }
+        }
       },
       "content": {
         "type": "text",
-        "analyzer": "app_english"
+        "analyzer": "app_english",
+        "fields": {
+          "phrase": {
+            "type": "text",
+            "analyzer": "app_phrase"
+          },
+          "incremental": {
+            "type": "search_as_you_type",
+            "analyzer": "app_phrase"
+          }
+        }
       },
       "expected": {
         "type": "text",
-        "analyzer": "app_english"
+        "analyzer": "app_english",
+        "fields": {
+          "phrase": {
+            "type": "text",
+            "analyzer": "app_phrase"
+          },
+          "incremental": {
+            "type": "search_as_you_type",
+            "analyzer": "app_phrase"
+          }
+        }
       },
       "id": {
-        "type": "keyword"
+        "type": "keyword",
+        "normalizer": "app_keyword"
       },
       "kind": {
-        "type": "keyword"
+        "type": "keyword",
+        "normalizer": "app_keyword"
       },
       "steps": {
         "type": "text",
-        "analyzer": "app_english"
+        "analyzer": "app_english",
+        "fields": {
+          "phrase": {
+            "type": "text",
+            "analyzer": "app_phrase"
+          },
+          "incremental": {
+            "type": "search_as_you_type",
+            "analyzer": "app_phrase"
+          }
+        }
       },
       "system": {
         "type": "text",
-        "analyzer": "app_english"
+        "analyzer": "app_english",
+        "fields": {
+          "phrase": {
+            "type": "text",
+            "analyzer": "app_phrase"
+          },
+          "incremental": {
+            "type": "search_as_you_type",
+            "analyzer": "app_phrase"
+          }
+        }
       },
       "time": {
         "type": "date",
         "format": "epoch_second"
       },
       "user": {
-        "type": "keyword"
+        "type": "keyword",
+        "normalizer": "app_keyword"
       },
       "admin_user": {
-        "type": "keyword"
+        "type": "keyword",
+        "normalizer": "app_keyword"
       },
       "title": {
         "type": "text",
-        "analyzer": "app_english"
+        "analyzer": "app_english",
+        "fields": {
+          "phrase": {
+            "type": "text",
+            "analyzer": "app_phrase"
+          },
+          "incremental": {
+            "type": "search_as_you_type",
+            "analyzer": "app_phrase"
+          }
+        }
       }
     }
   },
@@ -86,6 +163,23 @@
             "app_english_stop",
             "app_english_stemmer",
             "app_english_synonyms"
+          ]
+        },
+        "app_phrase": {
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "app_english_synonyms"
+          ]
+        }
+      },
+      "normalizer": {
+        "app_keyword": {
+          "type": "custom",
+          "filter": [
+            "lowercase",
+            "asciifolding"
           ]
         }
       }

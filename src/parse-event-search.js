@@ -1,6 +1,7 @@
 const nearley = require('nearley')
 const fields = require('./fields')
 const nearleyQuery = require('./require-nearley')('query.ne')
+const requestKinds = require('./request-kinds')
 const ResponseError = require('./response-error')
 
 const nearleyGrammar = nearley.Grammar.fromCompiled(nearleyQuery)
@@ -13,9 +14,10 @@ const safeParseInt = (input) => {
   return out
 }
 
-const parseEventSearch = (params) => {
+const parseEventSearch = (params, requestKind) => {
   const musts = []
   const filters = []
+  const shoulds = []
   let includeKeys
 
   const includeParam = params.get('include')
@@ -65,7 +67,7 @@ const parseEventSearch = (params) => {
     })
   }
 
-  if (params.get('query') !== null) {
+  if (requestKind !== requestKinds.incremental && params.get('query') !== null) {
     const parser = new nearley.Parser(nearleyGrammar)
     try {
       parser.feed(params.get('query'))
@@ -77,19 +79,39 @@ const parseEventSearch = (params) => {
     }
     musts.push(parser.results[0])
   } else if (params.get('content') !== null) {
-    musts.push({
-      multi_match: {
-        query: params.get('content'),
-        fields: fields.matchFieldBoosts,
-        operator: 'AND',
-        type: 'cross_fields'
-      }
-    })
+    if (requestKind === requestKinds.incremental) {
+      musts.push({
+        multi_match: {
+          query: params.get('content'),
+          fields: fields.incrementalFieldBoosts,
+          operator: 'AND',
+          type: 'bool_prefix'
+        }
+      })
+      shoulds.push({
+        multi_match: {
+          query: params.get('content'),
+          fields: fields.matchFieldBoosts,
+          operator: 'AND',
+          type: 'phrase'
+        }
+      })
+    } else {
+      musts.push({
+        multi_match: {
+          query: params.get('content'),
+          fields: fields.matchFieldBoosts,
+          operator: 'AND',
+          type: 'cross_fields'
+        }
+      })
+    }
   }
 
   return {
     musts,
     filters,
+    shoulds,
     includeKeys
   }
 }

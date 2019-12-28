@@ -1,11 +1,12 @@
 FROM node:12-buster-slim
 
-WORKDIR /app
 COPY package.json yarn.lock /app/
-COPY src /app/src
+WORKDIR /app
 
 ENV NODE_ENV production
 RUN yarn
+
+COPY src /app/src
 
 ENV APP_PORT 8000
 ENV APP_HOST 0.0.0.0

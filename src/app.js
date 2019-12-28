@@ -43,12 +43,14 @@ http.createServer(async (req, res) => {
         req,
         sendResponse
       })
-    } else if (['/dtesters/search', '/dtesters/total', '/dtesters/users'].includes(splitUrl[0])) {
+    } else if (['/dtesters/search', '/dtesters/total', '/dtesters/users', '/dtesters/incremental'].includes(splitUrl[0])) {
       let requestKind
       if (splitUrl[0] === '/dtesters/search') {
         requestKind = requestKinds.search
       } else if (splitUrl[0] === '/dtesters/total') {
         requestKind = requestKinds.total
+      } else if (splitUrl[0] === '/dtesters/incremental') {
+        requestKind = requestKinds.incremental
       } else {
         requestKind = requestKinds.users
       }

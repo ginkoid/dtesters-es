@@ -23,16 +23,17 @@ const handleQuery = async ({
 
   let musts = []
   let filters = []
+  let shoulds = []
   let sort
   let includeKeys
   let highlightsParam
   let highlightsFields = {}
 
   if (requestKind !== requestKinds.users) {
-    ({ musts, filters, includeKeys } = parseEventSearch(params))
+    ({ musts, filters, shoulds, includeKeys } = parseEventSearch(params, requestKind))
   }
 
-  if (requestKind === requestKinds.search) {
+  if (requestKind === requestKinds.search || requestKind === requestKinds.incremental) {
     ({ sort, highlightsParam, highlightsFields } = parseSearch(params))
   }
 
@@ -53,6 +54,7 @@ const handleQuery = async ({
   const query = {
     bool: {
       must: musts,
+      should: shoulds,
       filter: filters
     }
   }
@@ -87,13 +89,13 @@ const handleQuery = async ({
     result = await elastic.search(searchParams)
   }
   if (result.statusCode !== 200 || result.body.timed_out) {
-    console.log(result)
+    console.error(result)
     throw new Error('search failure')
   }
   res.writeHead(200, {
     'content-type': 'application/json'
   })
-  if (requestKind === requestKinds.search || requestKind === requestKinds.users) {
+  if (requestKind !== requestKinds.total) {
     res.end(JSON.stringify({
       total: result.body.hits.total,
       hits: result.body.hits.hits.map(hit => formatHit({

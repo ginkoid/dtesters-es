@@ -35,7 +35,7 @@ const formatHit = ({
 }) => {
   let highlightResult
   let event
-  if (requestKind === requestKinds.search) {
+  if (requestKind === requestKinds.search || requestKind === requestKinds.incremental) {
     highlightResult = []
     const highlight = hit.highlight || {}
     let hightlightEntries = Object.entries(highlight)

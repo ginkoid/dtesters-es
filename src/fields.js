@@ -11,9 +11,16 @@ const matchBoosts = {
   system: 1
 }
 const matchFieldBoosts = matchFields.map(field => `${field}^${matchBoosts[field]}`)
+const incrementalFieldBoosts = matchFields.flatMap(field => [
+  `${field}.incremental^${matchBoosts[field]}`,
+  `${field}.incremental._2gram^${matchBoosts[field]}`,
+  `${field}.incremental._3gram^${matchBoosts[field]}`,
+  `${field}.incremental._index_prefix^${matchBoosts[field]}`
+])
 module.exports = {
   termFields,
   matchFields,
   highlightFields,
-  matchFieldBoosts
+  matchFieldBoosts,
+  incrementalFieldBoosts
 }
