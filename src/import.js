@@ -4,6 +4,7 @@ const got = require('got')
 const pMap = require('p-map')
 const { Client: ElasticClient } = require('@elastic/elasticsearch')
 const makeParseEvent = require('./make-parse-event')
+const archiveStore = require('./archive-store')
 
 const boards = process.env.APP_TRELLO_BOARDS.split(',')
 const startDate = process.env.APP_TRELLO_START_DATE
@@ -44,6 +45,7 @@ const requestCard = async (id) => {
     return requestCard(id)
   }
   const body = JSON.parse(res.body)
+  archiveStore.makeCard(body)
   cardCache.set(id, body)
   return body
 }
@@ -65,6 +67,8 @@ const importEvent = async (action) => {
     return
   }
 
+  archiveStore.makeAction(action)
+
   const eventBody = await parseEvent(action)
   if (eventBody === undefined) {
     return
@@ -83,7 +87,7 @@ const importChunk = async (before, board) => {
   const tryRequest = async () => {
     try {
       actions = JSON.parse((await got(
-        `https://api.trello.com/1/boards/${board}/actions/?limit=1000&filter=createCard,commentCard,updateCard,addAttachmentToCard&before=${before}`
+        `https://api.trello.com/1/boards/${board}/actions/?limit=1000&before=${before}`
       )).body)
     } catch (e) {
       await wait(5000)

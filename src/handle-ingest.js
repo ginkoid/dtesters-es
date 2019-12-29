@@ -3,6 +3,7 @@ const got = require('got')
 const elastic = require('./elastic')
 const makeParseEvent = require('./make-parse-event')
 const validateTrelloHook = require('./validate-trello-hook')
+const archiveStore = require('./archive-store')
 
 const wait = (time) => new Promise((resolve) => setTimeout(() => resolve(), time))
 
@@ -18,6 +19,7 @@ const requestCard = async (id) => {
     return requestCard(id)
   }
   const body = JSON.parse(res.body)
+  archiveStore.makeCard(res.body)
   return body
 }
 
@@ -43,6 +45,8 @@ const handleIngest = async ({
   const body = await validateTrelloHook(req)
 
   sendResponse(200, 'Event received.')
+
+  archiveStore.makeAction(body.action)
 
   const eventBody = await parseEvent(body.action)
   if (eventBody === undefined) {
