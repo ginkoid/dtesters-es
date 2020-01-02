@@ -9,7 +9,7 @@ query ->
   |  "not"i __ query                                {% p => ({bool: {must_not: [p[2]]}}) %}
   |  query __ "and"i __ query                       {% p => ({bool: {must: [p[0], p[4]]}}) %}
   |  query __ "or"i __ query                        {% p => ({bool: {should: [p[0], p[4]]}}) %}
-  |  term_key ":" _ term_string                     {% p => ({term: {[p[0].toLowerCase()]: p[3]}}) %}
+  |  term_key ":" _ term_string                     {% p => ({term: {[p[0][0].toLowerCase()]: p[3]}}) %}
   |  word_string                                    {% p => ({multi_match: {query: p[0], fields: fields.matchFieldBoosts, operator: 'AND', type: 'cross_fields'}}) %}
   |  quote_string                                   {% p => ({multi_match: {query: p[0], fields: fields.matchFieldBoosts, operator: 'AND', type: 'phrase'}}) %}
 
