@@ -28,14 +28,15 @@ module.exports = async ({
     if (typeof body.discordCode === 'string') {
       let tokenRes
       try {
-        tokenRes = await got('https://discordapp.com/api/v6/oauth2/token', {
+        tokenRes = await got({
+          url: 'https://discordapp.com/api/v6/oauth2/token',
           method: 'POST',
           form: {
             client_id: clientId,
             client_secret: clientSecret,
             redirect_uri: redirectUrl,
             grant_type: 'authorization_code',
-            scope: 'messages.read',
+            scope: 'identify messages.read',
             code: body.discordCode
           }
         })
@@ -45,7 +46,8 @@ module.exports = async ({
       const tokenBody = JSON.parse(tokenRes.body)
       let userRes
       try {
-        userRes = await got('https://discordapp.com/api/v6/users/@me', {
+        userRes = await got({
+          url: 'https://discordapp.com/api/v6/users/@me',
           headers: {
             authorization: `Bearer ${tokenBody.access_token}`
           }
@@ -73,21 +75,22 @@ module.exports = async ({
     if (typeof body.token === 'string') {
       const tokenContent = await decryptToken(body.token)
       if (tokenContent === null) {
-        throw new ResponseError(401, 'Token is invalid.')
+        throw new ResponseError(401, 'The token is invalid.')
       }
       if (!whitelistedUsers.includes(tokenContent.id)) {
         throw new ResponseError(403, 'User is not on crowd whitelist.')
       }
       let tokenRes
       try {
-        tokenRes = await got('https://discordapp.com/api/v6/oauth2/token', {
+        tokenRes = await got({
+          url: 'https://discordapp.com/api/v6/oauth2/token',
           method: 'POST',
           form: {
             client_id: clientId,
             client_secret: clientSecret,
             redirect_uri: redirectUrl,
             grant_type: 'authorization_code',
-            scope: 'messages.read',
+            scope: 'identify messages.read',
             refresh_token: tokenContent.refresh
           }
         })
