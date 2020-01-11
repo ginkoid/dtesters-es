@@ -9,6 +9,8 @@ const clientSecret = process.env.APP_DISCORD_CLIENT_SECRET
 const redirectUrl = process.env.APP_DISCORD_REDIRECT_URL
 const whitelistedUsers = process.env.APP_DISCORD_CROWD_WHITELIST.split(',')
 
+const scopes = 'identify rpc messages.read'
+
 module.exports = async ({
   req,
   res
@@ -36,7 +38,7 @@ module.exports = async ({
             client_secret: clientSecret,
             redirect_uri: redirectUrl,
             grant_type: 'authorization_code',
-            scope: 'identify messages.read',
+            scope: scopes,
             code: body.discordCode
           }
         })
@@ -89,8 +91,8 @@ module.exports = async ({
             client_id: clientId,
             client_secret: clientSecret,
             redirect_uri: redirectUrl,
-            grant_type: 'authorization_code',
-            scope: 'identify messages.read',
+            grant_type: 'refresh_token',
+            scope: scopes,
             refresh_token: tokenContent.refresh
           }
         })
