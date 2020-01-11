@@ -4,6 +4,7 @@ COPY package.json yarn.lock /app/
 WORKDIR /app
 
 ENV NODE_ENV production
+RUN apt update && apt install python make g++ -y
 RUN yarn
 
 COPY src /app/src
