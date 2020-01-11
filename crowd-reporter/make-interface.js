@@ -1,0 +1,155 @@
+const net = require('net')
+const { promisify } = require('util')
+const crypto = require('crypto')
+const EventEmitter = require('events')
+
+const minPipeId = 0
+const maxPipeId = 10
+
+const ops = {
+  HANDSHAKE: 0,
+  FRAME: 1
+}
+
+const encodePacket = (op, data) => {
+  const payload = JSON.stringify(data)
+  const len = Buffer.byteLength(payload)
+  const packet = Buffer.alloc(8 + len)
+  packet.writeInt32LE(op, 0)
+  packet.writeInt32LE(len, 4)
+  packet.write(payload, 8, len)
+  return packet
+}
+
+const parseMaxPackets = (data) => {
+  let remaining = data
+  const result = []
+  while (remaining.length >= 8) {
+    const len = remaining.readInt32LE(4)
+    const payload = JSON.parse(remaining.slice(8, len + 8))
+    result.push(payload)
+    remaining = remaining.slice(len + 9)
+  }
+  return { result, remaining }
+}
+
+const randomBytes = promisify(crypto.randomBytes)
+
+const makeNonce = async () => (await randomBytes(16)).toString('hex')
+
+const rawConnect = (pipeId, clientId) => new Promise((resolve, reject) => {
+  const conn = net.createConnection(`\\\\?\\pipe\\discord-ipc-${pipeId}`)
+  let connected = false
+  const timeoutId = setTimeout(async () => {
+    if (!connected) {
+      conn.close()
+      if (pipeId === maxPipeId) {
+        reject(new Error('could not connect to discord'))
+      }
+      resolve(await rawConnect(pipeId + 1))
+    }
+  }, 1000)
+  const pendingRequests = new Map()
+  // eslint-disable-next-line no-async-promise-executor, promise/param-names
+  const sendRequest = ({ cmd, args, evt }) => new Promise(async (reqResolve, reqReject) => {
+    const nonce = await makeNonce()
+    pendingRequests.set(nonce, {
+      resolve: reqResolve,
+      reject: reqReject
+    })
+    conn.write(encodePacket(ops.FRAME, { cmd, args, evt, nonce }))
+  })
+  const emitter = new EventEmitter()
+  let remaining = Buffer.alloc(0)
+  conn.on('data', (data) => {
+    connected = true
+    remaining = Buffer.concat([remaining, data])
+    const parseResult = parseMaxPackets(remaining)
+    remaining = parseResult.remaining
+    parseResult.result.forEach((content) => {
+      console.log(JSON.stringify(content))
+      if (content.cmd === 'DISPATCH') {
+        emitter.emit('dispatch', content)
+        return
+      }
+      const request = pendingRequests.get(content.nonce)
+      if (request === undefined) {
+        return
+      }
+      pendingRequests.delete(content.nonce)
+      request.resolve(content)
+    })
+  })
+  conn.on('error', async () => {
+    clearTimeout(timeoutId)
+    resolve(await rawConnect(pipeId + 1))
+  })
+  conn.on('close', () => {
+    pendingRequests.forEach((request) => {
+      request.reject(new Error('discord connection closed while request was pending'))
+    })
+  })
+  conn.on('connect', () => {
+    conn.write(encodePacket(ops.HANDSHAKE, {
+      v: 1,
+      client_id: '665386796359745546'
+    }))
+  })
+  resolve({
+    emitter,
+    conn,
+    sendRequest
+  })
+})
+
+const makeInterface = (clientId) => {
+  let connProm
+  let connected = false
+  let queue = []
+  const initRequests = []
+  const emitter = new EventEmitter()
+  const initConn = () => {
+    connProm = rawConnect(minPipeId, clientId)
+    connProm.then((conn) => {
+      conn.emitter.on('dispatch', (content) => {
+        if (content.evt !== 'READY') {
+          return
+        }
+        connected = true
+        initRequests.forEach((initRequest) => {
+          conn.sendRequest(initRequest)
+        })
+        queue.forEach((item) => {
+          conn.sendRequest(item.req).then(item.resolve, item.reject)
+        })
+        queue = []
+      })
+      conn.conn.on('close', () => {
+        connected = false
+        setTimeout(() => {
+          initConn()
+        }, 1000)
+      })
+      conn.emitter.on('dispatch', (...rest) => emitter.emit('dispatch', ...rest))
+    })
+  }
+  initConn()
+  // eslint-disable-next-line no-async-promise-executor
+  return {
+    emitter,
+    addInitRequest: (req) => initRequests.push(req),
+    request: (req) => new Promise((resolve, reject) => {
+      if (connected) {
+        connProm.then((conn) => conn.sendRequest(req).then(resolve, reject), reject)
+      } else {
+        queue.push({
+          resolve,
+          reject,
+          req
+        })
+      }
+    })
+  }
+}
+
+module.exports = makeInterface
