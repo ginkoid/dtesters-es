@@ -4,7 +4,7 @@ const ResponseError = require('./response-error')
 const requestKinds = require('./request-kinds')
 const handleQuery = require('./handle-query')
 const handleIngest = require('./handle-ingest')
-const handleToken = require('./handle-token')
+const handleReport = require('./handle-report')
 
 const port = parseInt(process.env.APP_PORT)
 const host = process.env.APP_HOST
@@ -44,14 +44,14 @@ http.createServer(async (req, res) => {
         req,
         sendResponse
       })
-    } else if (splitUrl[0] === '/dtesters/crowd/token') {
+    } else if (splitUrl[0] === '/dtesters/crowd/report') {
       if (req.method !== 'POST') {
         throw new ResponseError(405, 'The request method is invalid.')
       }
 
-      await handleToken({
+      await handleReport({
         req,
-        res
+        sendResponse
       })
     } else if (['/dtesters/search', '/dtesters/total', '/dtesters/users', '/dtesters/incremental'].includes(splitUrl[0])) {
       let requestKind

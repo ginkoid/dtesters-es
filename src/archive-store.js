@@ -28,5 +28,5 @@ const makeCard = (card) => {
 
 module.exports = {
   makeAction,
-  makeCard,
+  makeCard
 }
