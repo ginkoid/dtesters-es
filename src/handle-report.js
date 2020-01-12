@@ -56,7 +56,7 @@ const handleReport = async ({
     return
   }
   const token = req.headers.authorization.slice('Bearer '.length)
-  const tokenContent = decryptToken(token)
+  const tokenContent = await decryptToken(token)
   if (tokenContent === null || !tokenContent.permissions.includes('crowd:report')) {
     sendResponse(401, 'The crowd token is invalid.')
     return
