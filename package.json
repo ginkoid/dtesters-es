@@ -4,6 +4,13 @@
   "author": "Philip Papurt <ginkoid@gmail.com> (https://gnk.io)",
   "license": "MIT",
   "private": true,
+  "scripts": {
+    "build:clean": "sh -c \"rm -rf build && mkdir build\"",
+    "build:winsw": "sh -c \"curl https://github.com/kohsuke/winsw/releases/download/winsw-v2.2.0/WinSW.NET4.exe -Lo build/winsw.exe\"",
+    "build:assets": "sh -c \"cp crowd-assets/* build\"",
+    "build:pkg": "sh -c \"cd crowd-reporter && pkg -t node12-win-x86 -o ../build/dtes-crowd-reporter.exe app.js\"",
+    "build": "yarn build:clean && yarn build:winsw && yarn build:assets && yarn build:pkg"
+  },
   "dependencies": {
     "@elastic/elasticsearch": "^7.5.0",
     "ajv": "^6.10.2",
@@ -16,6 +23,7 @@
     "raw-body": "^2.4.1"
   },
   "devDependencies": {
+    "pkg": "^4.4.2",
     "standard": "^14.3.1"
   }
 }

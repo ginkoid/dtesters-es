@@ -12,7 +12,7 @@ const reportingChannelIds = ['327914056591736834']
 
 const waitTime = (time) => new Promise((resolve) => setTimeout(resolve, time))
 
-const configFilePath = process.env.HOME + '/.dtes-crowd-config.json'
+const configFilePath = './config.json'
 const config = JSON.parse(fs.readFileSync(configFilePath))
 
 const writeFile = promisify(fs.writeFile)

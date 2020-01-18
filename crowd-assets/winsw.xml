@@ -1,0 +1,8 @@
+<configuration>
+  <id>dtes-crowd-reporter</id>
+  <name>DTesters ES Crowd Reporter</name>
+  <description>DTesters ES Crowd Reporter</description>
+  <executable>%BASE%\dtes-crowd-reporter.exe</executable>
+  <workingdirectory>%BASE%</workingdirectory>
+  <onfailure action="restart" delay="5 sec" />
+</configuration>
