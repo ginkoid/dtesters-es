@@ -35,6 +35,10 @@
         "type": "keyword",
         "normalizer": "app_keyword"
       },
+      "message": {
+        "type": "keyword",
+        "normalizer": "app_keyword"
+      },
       "link": {
         "type": "keyword",
         "normalizer": "app_keyword"

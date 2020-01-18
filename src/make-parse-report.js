@@ -7,8 +7,9 @@ module.exports = (addUser) => ({ channelId, message }, addEvent) => {
   }
 
   const denyEventBody = {
+    time: Math.floor((new Date(message.timestamp)).valueOf() / 1000),
     kind: 'deny',
-    time: Math.floor((new Date(message.timestamp)).valueOf() / 1000)
+    message: message.id
   }
 
   const parsedContent = message.content.match(/^───────────────────────\n(?:<#(?<channel>[0-9]*|undefined?)>: \*\*#(?<id_begin>[0-9]*?)\*\* \n)?\*\*(?<user>.*?#[0-9]{4})\*\* Reported:\n\n\*\*Short description:\*\* (?<title>.*?)\n\*\*Steps to reproduce:\*\* (?<steps>.*?)\n\*\*Expected result:\*\* (?<expected>.*?)\n\*\*Actual result:\*\* (?<actual>.*?)\n\*\*Client settings:\*\* (?<client>.*?)\n\*\*System settings:\*\* (?<system>.*?)\n\n(?:(?:.*?)\*\*#(?<id_end>[0-9]+)\*\* -)?/is)
@@ -38,7 +39,8 @@ module.exports = (addUser) => ({ channelId, message }, addEvent) => {
 
   parsedRepros.forEach((repro) => {
     const eventBody = {
-      time: Math.floor((new Date(message.timestamp)).valueOf() / 1000)
+      time: Math.floor((new Date(message.timestamp)).valueOf() / 1000),
+      message: message.id
     }
 
     if (repro[1] === '<:greenTick:312314752711786497>' || repro[1] === 'white_check_mark') {
@@ -48,6 +50,11 @@ module.exports = (addUser) => ({ channelId, message }, addEvent) => {
     }
     eventBody.user = repro[2]
     eventBody.content = repro[4]
+
+    if (parsedContent !== null) {
+      eventBody.channel = parsedContent.groups.channel
+      eventBody.id = parsedContent.groups.id_begin || parsedContent.groups.id_end
+    }
 
     addUser(eventBody.user)
     addEvent(eventBody)
