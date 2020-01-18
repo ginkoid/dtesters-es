@@ -11,8 +11,8 @@ module.exports = (addUser) => ({ channelId, message }, addEvent) => {
     time: Math.floor((new Date(message.timestamp)).valueOf() / 1000)
   }
 
-  const parsedContent = message.content.match(/^───────────────────────\n(?:<#(?<channel>[0-9]*|undefined?)>: \*\*#(?<id_begin>[0-9]*?)\*\* \n)?\*\*(?<user>.{2,32}#[0-9]{4})\*\* Reported:\n\n\*\*Short description:\*\* (?<title>.*?)\n\*\*Steps to reproduce:\*\* (?<steps>.*?)\n\*\*Expected result:\*\* (?<expected>.*?)\n\*\*Actual result:\*\* (?<actual>.*?)\n\*\*Client settings:\*\* (?<client>.*?)\n\*\*System settings:\*\* (?<system>.*?)\n\n(?:(?:.*?)\*\*#(?<id_end>[0-9]+)\*\* -)?/is)
-  const parsedRepros = [...message.content.matchAll(/(?: - :)?(<:greenTick:312314752711786497>|<:redTick:312314733816709120>|x|white_check_mark)(?:: \| | \*\*)(.{2,32}#[0-9]{4})(?:\*\*\(`|\()([0-9]*)(?:`\): |\) => )`(.*?)`/isg)]
+  const parsedContent = message.content.match(/^───────────────────────\n(?:<#(?<channel>[0-9]*|undefined?)>: \*\*#(?<id_begin>[0-9]*?)\*\* \n)?\*\*(?<user>.*?#[0-9]{4})\*\* Reported:\n\n\*\*Short description:\*\* (?<title>.*?)\n\*\*Steps to reproduce:\*\* (?<steps>.*?)\n\*\*Expected result:\*\* (?<expected>.*?)\n\*\*Actual result:\*\* (?<actual>.*?)\n\*\*Client settings:\*\* (?<client>.*?)\n\*\*System settings:\*\* (?<system>.*?)\n\n(?:(?:.*?)\*\*#(?<id_end>[0-9]+)\*\* -)?/is)
+  const parsedRepros = [...message.content.matchAll(/(?: - :)?(<:greenTick:312314752711786497>|<:redTick:312314733816709120>|x|white_check_mark)(?:: \| | \*\*)(.*?#[0-9]{4})(?:\*\*\(`|\()([0-9]*)(?:`\): |\) => )`(.*?)`/isg)]
 
   if (parsedContent === null) {
     denyEventBody.content = message.content

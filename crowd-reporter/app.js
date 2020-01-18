@@ -58,7 +58,7 @@ const reportEvent = (token, event) => new Promise((resolve, reject) => {
       authorization: `Bearer ${token}`
     }
   }, (res) => {
-    if (res.statusCode === 204) {
+    if (res.statusCode === 200) {
       resolve()
       return
     }

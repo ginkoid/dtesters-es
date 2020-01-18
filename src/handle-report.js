@@ -1,5 +1,6 @@
 const crypto = require('crypto')
 const getRawBody = require('raw-body')
+const got = require('got')
 const Ajv = require('ajv')
 const elastic = require('./elastic')
 const { decryptToken } = require('./token')
@@ -8,6 +9,7 @@ const makeParseReport = require('./make-parse-report')
 
 const ingestEventsIndexName = process.env.APP_ELASTIC_EVENTS_INGEST_INDEX
 const ingestUsersIndexName = process.env.APP_ELASTIC_USERS_INGEST_INDEX
+const logHookUrl = process.env.APP_DISCORD_LOG_HOOK_URL
 
 const addUser = async (user) => {
   await elastic.index({
@@ -77,6 +79,18 @@ const handleReport = async ({
     sendResponse(400, 'The request content is invalid.')
     return
   }
+
+  await got({
+    url: logHookUrl,
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      content: `User \`${tokenContent.id}\` reported an event ` +
+      '```' + JSON.stringify(body).replace(/```/g, '`\u200b``').slice(2000) + '```'
+    })
+  })
 
   sendResponse(200, 'Event received.')
 
