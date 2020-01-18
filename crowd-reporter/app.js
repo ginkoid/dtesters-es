@@ -74,8 +74,6 @@ const reportEvent = (token, event) => new Promise((resolve, reject) => {
   req.end(JSON.stringify(event))
 })
 
-const outStream = fs.createWriteStream('./yeet2.ndjson', { flags: 'a+' })
-
 discord.emitter.on('connect', async () => {
   let exchangeRes
 
@@ -146,19 +144,15 @@ discord.emitter.on('connect', async () => {
       return
     }
 
-    // await reportEvent(config.crowdToken, {
-    //   channelId: event.data.channel_id,
-    //   message: {
-    //     authorId: event.data.message.author.id,
-    //     content: event.data.message.content,
-    //     id: event.data.message.id,
-    //     timestamp: event.data.message.timestamp
-    //   }
-    // })
-    outStream.write(JSON.stringify({
+    await reportEvent(config.crowdToken, {
       channelId: event.data.channel_id,
-      message: event.data.message
-    }) + '\n')
+      message: {
+        authorId: event.data.message.author.id,
+        content: event.data.message.content,
+        id: event.data.message.id,
+        timestamp: event.data.message.timestamp
+      }
+    })
     console.log('reported message', event.data.message.id)
   })
 

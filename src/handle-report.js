@@ -84,7 +84,7 @@ const handleReport = async ({
   const addEvent = async (event) => {
     await elastic.index({
       index: ingestEventsIndexName,
-      id: `report-${event.message.id}-${messageEventIdx++}`,
+      id: `report-${body.message.id}-${messageEventIdx++}`,
       body: event
     })
   }
