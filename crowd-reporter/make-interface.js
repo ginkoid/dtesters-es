@@ -3,9 +3,6 @@ const { promisify } = require('util')
 const crypto = require('crypto')
 const EventEmitter = require('events')
 
-const minPipeId = 0
-const maxPipeId = 10
-
 const ops = {
   HANDSHAKE: 0,
   FRAME: 1
@@ -37,18 +34,8 @@ const randomBytes = promisify(crypto.randomBytes)
 
 const makeNonce = async () => (await randomBytes(16)).toString('hex')
 
-const rawConnect = (pipeId, clientId) => new Promise((resolve, reject) => {
-  const conn = net.createConnection(`\\\\?\\pipe\\discord-ipc-${pipeId}`)
-  let connected = false
-  const timeoutId = setTimeout(async () => {
-    if (!connected) {
-      conn.close()
-      if (pipeId === maxPipeId) {
-        reject(new Error('could not connect to discord'))
-      }
-      resolve(await rawConnect(pipeId + 1))
-    }
-  }, 1000)
+const rawConnect = (clientId) => new Promise((resolve, reject) => {
+  const conn = net.createConnection('\\\\?\\pipe\\discord-ipc-0')
   const pendingRequests = new Map()
   // eslint-disable-next-line no-async-promise-executor, promise/param-names
   const sendRequest = ({ cmd, args, evt }) => new Promise(async (reqResolve, reqReject) => {
@@ -62,12 +49,10 @@ const rawConnect = (pipeId, clientId) => new Promise((resolve, reject) => {
   const emitter = new EventEmitter()
   let remaining = Buffer.alloc(0)
   conn.on('data', (data) => {
-    connected = true
     remaining = Buffer.concat([remaining, data])
     const parseResult = parseMaxPackets(remaining)
     remaining = parseResult.remaining
     parseResult.result.forEach((content) => {
-      console.log(JSON.stringify(content))
       if (content.cmd === 'DISPATCH') {
         emitter.emit('dispatch', content)
         return
@@ -80,10 +65,6 @@ const rawConnect = (pipeId, clientId) => new Promise((resolve, reject) => {
       request.resolve(content)
     })
   })
-  conn.on('error', async () => {
-    clearTimeout(timeoutId)
-    resolve(await rawConnect(pipeId + 1))
-  })
   conn.on('close', () => {
     pendingRequests.forEach((request) => {
       request.reject(new Error('discord connection closed while request was pending'))
@@ -92,7 +73,7 @@ const rawConnect = (pipeId, clientId) => new Promise((resolve, reject) => {
   conn.on('connect', () => {
     conn.write(encodePacket(ops.HANDSHAKE, {
       v: 1,
-      client_id: '665386796359745546'
+      client_id: clientId
     }))
   })
   resolve({
@@ -104,50 +85,29 @@ const rawConnect = (pipeId, clientId) => new Promise((resolve, reject) => {
 
 const makeInterface = (clientId) => {
   let connProm
-  let connected = false
-  let queue = []
-  const initRequests = []
   const emitter = new EventEmitter()
   const initConn = () => {
-    connProm = rawConnect(minPipeId, clientId)
+    connProm = rawConnect(clientId)
     connProm.then((conn) => {
       conn.emitter.on('dispatch', (content) => {
+        emitter.emit('dispatch', content)
         if (content.evt !== 'READY') {
           return
         }
-        connected = true
-        initRequests.forEach((initRequest) => {
-          conn.sendRequest(initRequest)
-        })
-        queue.forEach((item) => {
-          conn.sendRequest(item.req).then(item.resolve, item.reject)
-        })
-        queue = []
+        emitter.emit('connect')
       })
       conn.conn.on('close', () => {
-        connected = false
         setTimeout(() => {
           initConn()
         }, 1000)
       })
-      conn.emitter.on('dispatch', (...rest) => emitter.emit('dispatch', ...rest))
     })
   }
   initConn()
-  // eslint-disable-next-line no-async-promise-executor
   return {
     emitter,
-    addInitRequest: (req) => initRequests.push(req),
     request: (req) => new Promise((resolve, reject) => {
-      if (connected) {
-        connProm.then((conn) => conn.sendRequest(req).then(resolve, reject), reject)
-      } else {
-        queue.push({
-          resolve,
-          reject,
-          req
-        })
-      }
+      connProm.then((conn) => conn.sendRequest(req).then(resolve, reject), reject)
     })
   }
 }

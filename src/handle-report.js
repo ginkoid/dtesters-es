@@ -1,7 +1,25 @@
+const crypto = require('crypto')
 const getRawBody = require('raw-body')
 const Ajv = require('ajv')
+const elastic = require('./elastic')
 const { decryptToken } = require('./token')
 const ResponseError = require('./response-error')
+const makeParseReport = require('./make-parse-report')
+
+const ingestEventsIndexName = process.env.APP_ELASTIC_EVENTS_INGEST_INDEX
+const ingestUsersIndexName = process.env.APP_ELASTIC_USERS_INGEST_INDEX
+
+const addUser = async (user) => {
+  await elastic.index({
+    index: ingestUsersIndexName,
+    id: crypto.createHash('sha256').update(user).digest('hex'),
+    body: {
+      user
+    }
+  })
+}
+
+const parseReport = makeParseReport(addUser)
 
 const schemaValidator = new Ajv().compile({
   type: 'object',
@@ -9,14 +27,8 @@ const schemaValidator = new Ajv().compile({
     message: {
       type: 'object',
       properties: {
-        author: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string'
-            }
-          },
-          required: ['id']
+        authorId: {
+          type: 'string'
         },
         content: {
           type: 'string'
@@ -28,7 +40,7 @@ const schemaValidator = new Ajv().compile({
           type: 'string'
         }
       },
-      required: ['author', 'content', 'id', 'timestamp']
+      required: ['authorId', 'content', 'id', 'timestamp']
     },
     channelId: {
       type: 'string'
@@ -65,7 +77,19 @@ const handleReport = async ({
     sendResponse(400, 'The request content is invalid.')
     return
   }
-  console.log(JSON.stringify(body))
+
+  sendResponse(200, 'Event received.')
+
+  let messageEventIdx = 0
+  const addEvent = async (event) => {
+    await elastic.index({
+      index: ingestEventsIndexName,
+      id: `report-${event.message.id}-${messageEventIdx++}`,
+      body: event
+    })
+  }
+
+  parseReport(body, addEvent)
 }
 
 module.exports = handleReport
