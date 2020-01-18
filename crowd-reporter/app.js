@@ -10,6 +10,8 @@ process.on('unhandledRejection', (e) => {
 
 const reportingChannelIds = ['327914056591736834']
 
+const waitTime = (time) => new Promise((resolve) => setTimeout(resolve, time))
+
 const configFilePath = process.env.HOME + '/.dtes-crowd-config.json'
 const config = JSON.parse(fs.readFileSync(configFilePath))
 
@@ -144,15 +146,28 @@ discord.emitter.on('connect', async () => {
       return
     }
 
-    await reportEvent(config.crowdToken, {
-      channelId: event.data.channel_id,
-      message: {
-        authorId: event.data.message.author.id,
-        content: event.data.message.content,
-        id: event.data.message.id,
-        timestamp: event.data.message.timestamp
+    const attemptReport = async (attempt) => {
+      try {
+        return reportEvent(config.crowdToken, {
+          channelId: event.data.channel_id,
+          message: {
+            authorId: event.data.message.author.id,
+            content: event.data.message.content,
+            id: event.data.message.id,
+            timestamp: event.data.message.timestamp
+          }
+        })
+      } catch (e) {
+        if (attempt === 5) {
+          throw new Error('could not report message')
+        }
+        await waitTime(1000 * (1 + attempt))
+        return attemptReport(attempt + 1)
       }
-    })
+    }
+
+    await attemptReport(0)
+
     console.log('reported message', event.data.message.id)
   })
 
