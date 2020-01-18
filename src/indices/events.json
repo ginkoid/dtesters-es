@@ -19,6 +19,10 @@
         "type": "keyword",
         "normalizer": "app_keyword"
       },
+      "channel": {
+        "type": "keyword",
+        "normalizer": "app_keyword"
+      },
       "list": {
         "type": "keyword",
         "normalizer": "app_keyword"
