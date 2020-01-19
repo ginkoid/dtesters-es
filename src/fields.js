@@ -1,4 +1,4 @@
-const termFields = ['board', 'channel', 'card', 'list', 'label', 'link', 'id', 'kind', 'user', 'admin_user']
+const termFields = ['board', 'channel', 'message', 'card', 'list', 'label', 'link', 'id', 'kind', 'user', 'admin_user']
 const matchFields = ['actual', 'client', 'content', 'expected', 'steps', 'system', 'title']
 const highlightFields = ['actual', 'client', 'content', 'expected', 'steps', 'system']
 const matchBoosts = {

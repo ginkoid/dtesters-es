@@ -13,7 +13,7 @@ query ->
   |  word_string                                    {% p => ({multi_match: {query: p[0], fields: fields.matchFieldBoosts, operator: 'AND', type: 'cross_fields'}}) %}
   |  quote_string                                   {% p => ({multi_match: {query: p[0], fields: fields.matchFieldBoosts, operator: 'AND', type: 'phrase'}}) %}
 
-term_key -> "board"i | "card"i | "link"i | "id"i | "kind"i | "user"i | "admin_user"i
+term_key -> "board"i | "channel"i | "message"i | "card"i | "list"i | "link"i | "id"i | "kind"i | "user"i | "admin_user"i
 term_string -> (([a-zA-Z0-9 ]:+) | ("\"" .:* "\"")) {% p => p[0][0].length === 3 ? p[0][0][1].join('') : p[0][0][0].join('') %}
 word_string -> ([a-zA-Z0-9 ]:+)                     {% p => p[0][0].join('') %}
 quote_string -> ("\"" .:* "\"")                     {% p => p[0][1].join('') %}
