@@ -11,8 +11,13 @@ db.exec(
   'create table if not exists cards (id text primary key not null, content text not null)'
 )
 
+db.exec(
+  'create table if not exists reports (id text not null, reporter text not null, content text not null)'
+)
+
 const actionStatement = db.prepare('insert into actions (id, content) values(?, ?)')
 const cardStatement = db.prepare('insert into cards (id, content) values(?, ?)')
+const reportStatement = db.prepare('insert into reports (id, reporter, content) values(?, ?, ?)')
 
 const makeAction = (action) => {
   try {
@@ -26,7 +31,14 @@ const makeCard = (card) => {
   } catch (e) {}
 }
 
+const makeReport = ({ report, reporter }) => {
+  try {
+    reportStatement.run(report.message.id, reporter, JSON.stringify(report))
+  } catch (e) {}
+}
+
 module.exports = {
   makeAction,
-  makeCard
+  makeCard,
+  makeReport
 }

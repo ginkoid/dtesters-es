@@ -5,6 +5,7 @@ const elastic = require('./elastic')
 const { decryptToken } = require('./token')
 const ResponseError = require('./response-error')
 const makeParseReport = require('./make-parse-report')
+const archiveStore = require('./archive-store')
 
 const ingestEventsIndexName = process.env.APP_ELASTIC_EVENTS_INGEST_INDEX
 const ingestUsersIndexName = process.env.APP_ELASTIC_USERS_INGEST_INDEX
@@ -79,6 +80,11 @@ const handleReport = async ({
   }
 
   sendResponse(200, 'Event received.')
+
+  archiveStore.makeReport({
+    report: body,
+    reporter: tokenContent.id
+  })
 
   let messageEventIdx = 0
   const addEvent = async (event) => {
