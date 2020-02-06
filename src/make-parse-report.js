@@ -50,11 +50,8 @@ module.exports = (addUser) => ({ channelId, message }, addEvent) => {
     }
     eventBody.user = repro[2]
     eventBody.content = repro[4]
-
-    if (parsedContent !== null) {
-      eventBody.channel = parsedContent.groups.channel
-      eventBody.id = parsedContent.groups.id_begin || parsedContent.groups.id_end
-    }
+    eventBody.channel = denyEventBody.channel
+    eventBody.id = denyEventBody.id
 
     addUser(eventBody.user)
     addEvent(eventBody)

@@ -1,7 +1,7 @@
 yarn-debug.log*
 yarn-error.log*
 /node_modules
-/build
+/crowd-build
 /.env
 
 .DS_Store

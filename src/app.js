@@ -31,7 +31,8 @@ http.createServer(async (req, res) => {
 
     if (splitUrl[0] === '/dtesters/events') {
       if (req.method === 'GET') {
-        throw new ResponseError(200, 'Event ingest is available.')
+        sendResponse(200, 'Event ingest is available.')
+        return
       }
       if (req.method !== 'POST') {
         throw new ResponseError(405, 'The request method is invalid.')
@@ -47,6 +48,9 @@ http.createServer(async (req, res) => {
     } else if (splitUrl[0] === '/dtesters/crowd/report') {
       if (req.method !== 'POST') {
         throw new ResponseError(405, 'The request method is invalid.')
+      }
+      if (req.headers['content-type'] !== 'application/json') {
+        throw new ResponseError(400, 'The request body must be JSON.')
       }
 
       await handleReport({

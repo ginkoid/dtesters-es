@@ -64,19 +64,16 @@ const handleReport = async ({
   } catch (e) {
     throw new ResponseError(400, 'The request body is invalid.')
   }
-  if (!req.headers.authorization.startsWith('Bearer ')) {
-    sendResponse(401, 'The crowd token was not provided.')
-    return
+  if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
+    throw new ResponseError(401, 'The crowd token was not provided.')
   }
   const token = req.headers.authorization.slice('Bearer '.length)
   const tokenContent = await decryptToken(token)
   if (tokenContent === null || !tokenContent.permissions.includes('crowd:report')) {
-    sendResponse(401, 'The crowd token is invalid.')
-    return
+    throw new ResponseError(401, 'The crowd token is invalid.')
   }
   if (!schemaValidator(body)) {
-    sendResponse(400, 'The request content is invalid.')
-    return
+    throw new ResponseError(400, 'The request content is invalid.')
   }
 
   sendResponse(200, 'Event received.')
