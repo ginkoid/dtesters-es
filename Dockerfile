@@ -1,12 +1,14 @@
-FROM node:12-buster-slim
+FROM node:12-buster-slim AS build
 
-COPY package.json yarn.lock /app/
 WORKDIR /app
-
-ENV NODE_ENV production
+COPY package.json yarn.lock ./
 RUN apt update && apt install python make g++ -y
+ENV NODE_ENV production
 RUN yarn
 
+FROM node:12-buster-slim AS run
+
+COPY --from=build /app /app
 COPY src /app/src
 
 ENV APP_PORT 8000

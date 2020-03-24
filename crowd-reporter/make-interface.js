@@ -34,7 +34,7 @@ const randomBytes = promisify(crypto.randomBytes)
 
 const makeNonce = async () => (await randomBytes(16)).toString('hex')
 
-const rawConnect = (clientId) => new Promise((resolve, reject) => {
+const rawConnect = (clientId) => new Promise((resolve) => {
   const conn = net.createConnection('\\\\?\\pipe\\discord-ipc-0')
   const pendingRequests = new Map()
   // eslint-disable-next-line no-async-promise-executor, promise/param-names
@@ -91,16 +91,16 @@ const makeInterface = (clientId) => {
     connProm.then((conn) => {
       conn.emitter.on('dispatch', (content) => {
         emitter.emit('dispatch', content)
-        if (content.evt !== 'READY') {
-          return
+        if (content.evt === 'READY') {
+          emitter.emit('connect')
         }
-        emitter.emit('connect')
       })
       conn.conn.on('close', () => {
         setTimeout(() => {
           initConn()
-        }, 1000)
+        }, 5000)
       })
+      conn.conn.on('error', console.error)
     })
   }
   initConn()

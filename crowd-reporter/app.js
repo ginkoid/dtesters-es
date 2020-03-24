@@ -76,27 +76,26 @@ const reportEvent = (token, event) => new Promise((resolve, reject) => {
   req.end(JSON.stringify(event))
 })
 
+const attemptUserOauth = async () => {
+  console.log('waiting for discord user oauth2 response')
+  const authorizeRes = await discord.request({
+    cmd: 'AUTHORIZE',
+    args: {
+      client_id: config.discordClientId,
+      scopes: ['identify', 'rpc', 'messages.read']
+    }
+  })
+  if (authorizeRes.evt === 'ERROR') {
+    throw new Error(authorizeRes.data.message)
+  }
+  console.log('waiting for code exchange')
+  return exchangeOauth({
+    code: authorizeRes.data.code
+  })
+}
+
 discord.emitter.on('connect', async () => {
   let exchangeRes
-
-  const attemptUserOauth2 = async () => {
-    console.log('waiting for discord user oauth2 response')
-    const authorizeRes = await discord.request({
-      cmd: 'AUTHORIZE',
-      args: {
-        client_id: config.discordClientId,
-        scopes: ['identify', 'rpc', 'messages.read']
-      }
-    })
-    if (authorizeRes.evt === 'ERROR') {
-      throw new Error(authorizeRes.data.message)
-    }
-    console.log('waiting for code exchange')
-    return exchangeOauth({
-      code: authorizeRes.data.code
-    })
-  }
-
   if (config._internal && config._internal.discordRefreshToken) {
     console.log('waiting for refresh token exchange')
     try {
@@ -104,10 +103,10 @@ discord.emitter.on('connect', async () => {
         refreshToken: config._internal.discordRefreshToken
       })
     } catch (e) {
-      exchangeRes = await attemptUserOauth2()
+      exchangeRes = await attemptUserOauth()
     }
   } else {
-    exchangeRes = await attemptUserOauth2()
+    exchangeRes = await attemptUserOauth()
   }
 
   console.log('saving refresh token')
@@ -161,7 +160,7 @@ discord.emitter.on('connect', async () => {
         if (attempt === 5) {
           throw new Error('could not report message')
         }
-        await waitTime(1000 * (1 + attempt))
+        await waitTime(2000 + 1000 * attempt)
         return attemptReport(attempt + 1)
       }
     }
