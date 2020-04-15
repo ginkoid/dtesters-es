@@ -82,7 +82,7 @@ const attemptUserOauth = async () => {
     cmd: 'AUTHORIZE',
     args: {
       client_id: config.discordClientId,
-      scopes: ['identify', 'rpc', 'messages.read']
+      scopes: ['rpc', 'messages.read']
     }
   })
   if (authorizeRes.evt === 'ERROR') {
@@ -94,7 +94,10 @@ const attemptUserOauth = async () => {
   })
 }
 
-discord.emitter.on('connect', async () => {
+discord.emitter.on('dispatch', async (dispatchEvt) => {
+  if (dispatchEvt.evt !== 'READY') {
+    return
+  }
   let exchangeRes
   if (config._internal && config._internal.discordRefreshToken) {
     console.log('waiting for refresh token exchange')

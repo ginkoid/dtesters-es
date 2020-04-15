@@ -25,7 +25,7 @@ const parseMaxPackets = (data) => {
     const len = remaining.readInt32LE(4)
     const payload = JSON.parse(remaining.slice(8, len + 8))
     result.push(payload)
-    remaining = remaining.slice(len + 9)
+    remaining = remaining.slice(len + 8)
   }
   return { result, remaining }
 }
@@ -86,29 +86,24 @@ const rawConnect = (clientId) => new Promise((resolve) => {
 const makeInterface = (clientId) => {
   let connProm
   const emitter = new EventEmitter()
-  const initConn = () => {
+  const initConn = async () => {
     connProm = rawConnect(clientId)
-    connProm.then((conn) => {
-      conn.emitter.on('dispatch', (content) => {
-        emitter.emit('dispatch', content)
-        if (content.evt === 'READY') {
-          emitter.emit('connect')
-        }
-      })
-      conn.conn.on('close', () => {
-        setTimeout(() => {
-          initConn()
-        }, 5000)
-      })
-      conn.conn.on('error', console.error)
+    const conn = await connProm
+    conn.emitter.on('dispatch', (content) => {
+      emitter.emit('dispatch', content)
     })
+    conn.conn.on('close', () => {
+      setTimeout(initConn, 5000)
+    })
+    conn.conn.on('error', console.error)
   }
   initConn()
   return {
     emitter,
-    request: (req) => new Promise((resolve, reject) => {
-      connProm.then((conn) => conn.sendRequest(req).then(resolve, reject), reject)
-    })
+    request: async (req) => {
+      const conn = await connProm
+      return conn.sendRequest(req)
+    }
   }
 }
 
