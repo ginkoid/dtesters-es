@@ -12,18 +12,18 @@
     "build": "yarn build:clean && yarn build:winsw && yarn build:assets && yarn build:pkg"
   },
   "dependencies": {
-    "@elastic/elasticsearch": "^7.5.0",
-    "ajv": "^6.10.2",
+    "@elastic/elasticsearch": "^7.8.0",
+    "ajv": "^6.12.3",
     "better-sqlite3": "^5.4.3",
     "dotenv": "^8.2.0",
-    "got": "^10.2.2",
+    "got": "^11.5.1",
     "he": "^1.2.0",
-    "nearley": "^2.19.0",
-    "p-map": "^3.0.0",
+    "nearley": "^2.19.5",
+    "p-map": "^4.0.0",
     "raw-body": "^2.4.1"
   },
   "devDependencies": {
-    "pkg": "^4.4.2",
-    "standard": "^14.3.1"
+    "pkg": "^4.4.9",
+    "standard": "^14.3.4"
   }
 }
